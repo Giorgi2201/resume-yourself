@@ -1,0 +1,410 @@
+<div class="page">
+  <div class="container">
+
+    @if (isLoading) {
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Loading results…</p>
+      </div>
+    }
+
+    @if (error) {
+      <div class="error-state">
+        <p>{{ error }}</p>
+        <button class="btn btn-secondary" (click)="loadResults()">Retry</button>
+      </div>
+    }
+
+    @if (results && !isLoading) {
+      <!-- PAGE HEADER -->
+      <div class="page-header">
+        <div class="header-left">
+          <a routerLink="/screenings" class="breadcrumb">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            All screenings
+          </a>
+          <h1 class="page-title">{{ results.jobTitle }}</h1>
+        </div>
+        <div class="header-right">
+          <button class="upload-btn" (click)="openUploadModal()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload CVs
+          </button>
+
+          <div class="header-stats">
+            <div class="hstat">
+              <span class="hstat-num">{{ results.totalCandidates }}</span>
+              <span class="hstat-label">candidates</span>
+            </div>
+            <div class="hstat-divider"></div>
+            <div class="hstat">
+              <span class="hstat-num">{{ results.averageScore }}</span>
+              <span class="hstat-label">avg. score</span>
+            </div>
+            <div class="hstat-divider"></div>
+            <div class="hstat">
+              <span class="hstat-num approved">{{ approvedCount }}</span>
+              <span class="hstat-label">approved</span>
+            </div>
+            <div class="hstat-divider"></div>
+            <div class="hstat">
+              <span class="hstat-num rejected">{{ rejectedCount }}</span>
+              <span class="hstat-label">rejected</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEGEND -->
+      <div class="legend">
+        <div class="legend-item">
+          <span class="legend-dot" style="background: #22c55e"></span>
+          Strong match (80+)
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot" style="background: #f59e0b"></span>
+          Potential (60–79)
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot" style="background: #ef4444"></span>
+          Weak match (&lt;60)
+        </div>
+        <div class="legend-sep"></div>
+        <div class="legend-item">
+          <span class="legend-dot" style="background: #6366f1"></span>
+          Core req. (70% weight)
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot" style="background: #a78bfa"></span>
+          Preferred (30% weight)
+        </div>
+      </div>
+
+      <!-- CANDIDATE LIST + DETAIL SPLIT VIEW -->
+      <div class="split-view" [class.has-detail]="selectedCandidate">
+
+        <!-- LIST -->
+        <div class="candidate-list">
+          @for (candidate of results.results; track trackByCandidate($index, candidate)) {
+            <div
+              class="candidate-card"
+              [class.selected]="selectedCandidate?.candidateId === candidate.candidateId"
+              [class.approved]="candidate.feedbackType === 'Approved'"
+              [class.rejected]="candidate.feedbackType === 'Rejected'"
+              (click)="selectCandidate(candidate)"
+            >
+              <!-- Rank badge -->
+              <div class="rank-badge" [ngClass]="getRankBadgeClass(candidate.rank)">
+                #{{ candidate.rank }}
+              </div>
+
+              <!-- Info -->
+              <div class="candidate-info">
+                <div class="candidate-top">
+                  <span class="candidate-name">{{ candidate.name }}</span>
+                  @if (candidate.feedbackType) {
+                    <span class="feedback-chip" [class.chip-approved]="candidate.feedbackType === 'Approved'" [class.chip-rejected]="candidate.feedbackType === 'Rejected'">
+                      @if (candidate.feedbackType === 'Approved') { ✓ Approved }
+                      @else { ✕ Rejected }
+                    </span>
+                  }
+                </div>
+                <div class="candidate-file">{{ candidate.fileName }}</div>
+                <!-- Show core keywords (high-weight) first, then secondary -->
+                <div class="keyword-tags">
+                  @for (kw of candidate.coreMatchedKeywords.slice(0, 3); track kw) {
+                    <span class="kw-tag core-matched" title="Core requirement">{{ kw }}</span>
+                  }
+                  @for (kw of candidate.secondaryMatchedKeywords.slice(0, 2); track kw) {
+                    <span class="kw-tag secondary-matched" title="Preferred">{{ kw }}</span>
+                  }
+                  @if (candidate.coreMatchedKeywords.length + candidate.secondaryMatchedKeywords.length > 5) {
+                    <span class="kw-tag more">+{{ candidate.coreMatchedKeywords.length + candidate.secondaryMatchedKeywords.length - 5 }}</span>
+                  }
+                  @if (candidate.hardFilters.length > 0) {
+                    <span class="kw-tag hard-filter" title="Hard filter — verify manually">⚠ {{ candidate.hardFilters.length }} manual</span>
+                  }
+                </div>
+              </div>
+
+              <!-- Score -->
+              <div class="score-section">
+                <div class="score-ring-wrap">
+                  <svg class="score-ring" width="52" height="52" viewBox="0 0 52 52">
+                    <circle cx="26" cy="26" r="21" fill="none" stroke="var(--border)" stroke-width="3"/>
+                    <circle
+                      cx="26" cy="26" r="21"
+                      fill="none"
+                      [attr.stroke]="getScoreColor(candidate.score)"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                      [attr.stroke-dasharray]="'132'"
+                      [attr.stroke-dashoffset]="132 - (132 * candidate.score / 100)"
+                      transform="rotate(-90 26 26)"
+                    />
+                    <text x="26" y="30" text-anchor="middle" font-size="11" font-weight="700" fill="white" font-family="Inter, sans-serif">{{ candidate.score }}</text>
+                  </svg>
+                </div>
+                <div class="score-label" [style.color]="getScoreColor(candidate.score)">
+                  {{ getScoreLabel(candidate.score) }}
+                </div>
+              </div>
+            </div>
+          }
+
+          @if (results.results.length === 0) {
+            <div class="empty-state">
+              <p>No candidates found for this job yet.</p>
+            </div>
+          }
+        </div>
+
+        <!-- DETAIL PANEL -->
+        @if (selectedCandidate) {
+          <div class="detail-panel">
+            <div class="detail-header">
+              <div class="detail-candidate-name">{{ selectedCandidate.name }}</div>
+              <button class="detail-close" (click)="closeDetail()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            <!-- Score + sub-scores -->
+            <div class="detail-score-section">
+              <div class="detail-score-circle">
+                <svg width="92" height="92" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border)" stroke-width="6"/>
+                  <circle
+                    cx="50" cy="50" r="42"
+                    fill="none"
+                    [attr.stroke]="getScoreColor(selectedCandidate.score)"
+                    stroke-width="6"
+                    stroke-linecap="round"
+                    stroke-dasharray="264"
+                    [attr.stroke-dashoffset]="264 - (264 * selectedCandidate.score / 100)"
+                    transform="rotate(-90 50 50)"
+                  />
+                  <text x="50" y="55" text-anchor="middle" font-size="24" font-weight="700" fill="white" font-family="Inter, sans-serif">{{ selectedCandidate.score }}</text>
+                </svg>
+              </div>
+              <div class="detail-score-info">
+                <div class="detail-score-label" [style.color]="getScoreColor(selectedCandidate.score)">
+                  {{ getScoreLabel(selectedCandidate.score) }}
+                </div>
+                <div class="detail-score-sub">Rank #{{ selectedCandidate.rank }}</div>
+                <!-- Mini sub-score bars -->
+                <div class="sub-scores">
+                  @if (selectedCandidate.totalCoreKeywords > 0) {
+                    <div class="sub-score-row">
+                      <span class="sub-score-label core-label">Core</span>
+                      <div class="sub-score-track">
+                        <div class="sub-score-fill core-fill" [style.width.%]="coreMatchPct(selectedCandidate)"></div>
+                      </div>
+                      <span class="sub-score-pct">{{ coreMatchPct(selectedCandidate) }}%</span>
+                    </div>
+                  }
+                  @if (selectedCandidate.totalSecondaryKeywords > 0) {
+                    <div class="sub-score-row">
+                      <span class="sub-score-label secondary-label">Preferred</span>
+                      <div class="sub-score-track">
+                        <div class="sub-score-fill secondary-fill" [style.width.%]="secondaryMatchPct(selectedCandidate)"></div>
+                      </div>
+                      <span class="sub-score-pct">{{ secondaryMatchPct(selectedCandidate) }}%</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+
+            @if (selectedCandidate.scoreReasons.length > 0) {
+              <div class="detail-section">
+                <div class="detail-section-title notes-title">Scoring Notes</div>
+                <ul class="score-reasons">
+                  @for (reason of selectedCandidate.scoreReasons.slice(0, 6); track reason) {
+                    <li>{{ reason }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            <!-- HARD FILTERS -->
+            @if (selectedCandidate.hardFilters.length > 0) {
+              <div class="detail-section">
+                <div class="detail-section-title hard-filter-title">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  Hard Filters — verify manually
+                </div>
+                <div class="hard-filter-list">
+                  @for (hf of selectedCandidate.hardFilters; track hf) {
+                    <div class="hard-filter-item">
+                      <span class="hf-dot"></span>
+                      {{ hf }}
+                    </div>
+                  }
+                </div>
+                <div class="hard-filter-note">These cannot be inferred from a CV. Confirm with the candidate directly.</div>
+              </div>
+            }
+
+            <!-- CORE REQUIREMENTS -->
+            @if (selectedCandidate.totalCoreKeywords > 0) {
+              <div class="detail-section">
+                <div class="detail-section-title core-title">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  Core Requirements
+                  <span class="tier-weight">70% weight</span>
+                </div>
+
+                @if (selectedCandidate.coreMatchedKeywords.length > 0) {
+                  <div class="kw-subsection">
+                    <span class="kw-sublabel matched-label">✓ Matched ({{ selectedCandidate.coreMatchedKeywords.length }})</span>
+                    <div class="keyword-cloud">
+                      @for (kw of selectedCandidate.coreMatchedKeywords; track kw) {
+                        <span class="kw-tag core-matched">{{ kw }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+                @if (selectedCandidate.coreMissingKeywords.length > 0) {
+                  <div class="kw-subsection">
+                    <span class="kw-sublabel missing-label">✕ Missing ({{ selectedCandidate.coreMissingKeywords.length }})</span>
+                    <div class="keyword-cloud">
+                      @for (kw of selectedCandidate.coreMissingKeywords; track kw) {
+                        <span class="kw-tag core-missing">{{ kw }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- SECONDARY / PREFERRED -->
+            @if (selectedCandidate.totalSecondaryKeywords > 0) {
+              <div class="detail-section">
+                <div class="detail-section-title secondary-title">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  Preferred Skills
+                  <span class="tier-weight">30% weight</span>
+                </div>
+
+                @if (selectedCandidate.secondaryMatchedKeywords.length > 0) {
+                  <div class="kw-subsection">
+                    <span class="kw-sublabel matched-label">✓ Has ({{ selectedCandidate.secondaryMatchedKeywords.length }})</span>
+                    <div class="keyword-cloud">
+                      @for (kw of selectedCandidate.secondaryMatchedKeywords; track kw) {
+                        <span class="kw-tag secondary-matched">{{ kw }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+                @if (selectedCandidate.secondaryMissingKeywords.length > 0) {
+                  <div class="kw-subsection">
+                    <span class="kw-sublabel missing-label">✕ Missing ({{ selectedCandidate.secondaryMissingKeywords.length }})</span>
+                    <div class="keyword-cloud">
+                      @for (kw of selectedCandidate.secondaryMissingKeywords; track kw) {
+                        <span class="kw-tag secondary-missing">{{ kw }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Feedback actions -->
+            <div class="detail-feedback">
+              <button
+                class="feedback-btn approve"
+                [class.active]="selectedCandidate.feedbackType === 'Approved'"
+                [disabled]="feedbackLoading[selectedCandidate.candidateId]"
+                (click)="submitFeedback(selectedCandidate, 'Approved')"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+                {{ selectedCandidate.feedbackType === 'Approved' ? 'Undo Approve' : 'Approve' }}
+              </button>
+              <button
+                class="feedback-btn reject"
+                [class.active]="selectedCandidate.feedbackType === 'Rejected'"
+                [disabled]="feedbackLoading[selectedCandidate.candidateId]"
+                (click)="submitFeedback(selectedCandidate, 'Rejected')"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
+                {{ selectedCandidate.feedbackType === 'Rejected' ? 'Undo Reject' : 'Reject' }}
+              </button>
+            </div>
+          </div>
+        }
+
+      </div>
+    }
+
+    @if (isUploadModalOpen) {
+      <div class="upload-modal-backdrop" (click)="closeUploadModal()">
+        <div class="upload-modal" (click)="$event.stopPropagation()">
+          <div class="upload-modal-header">
+            <div>
+              <h3>Upload Additional CVs</h3>
+              <p>Add more candidates to this screening. Files are parsed, scored, and merged into ranking.</p>
+            </div>
+          </div>
+
+          <div
+            class="upload-dropzone"
+            [class.active]="isDropActive"
+            (dragover)="onUploadDragOver($event)"
+            (dragleave)="onUploadDragLeave()"
+            (drop)="onUploadDrop($event)"
+          >
+            <input #uploadInput type="file" multiple accept=".pdf,.docx" hidden (change)="onUploadInputChange($event)" />
+            <p>Drag & drop PDF or DOCX files here</p>
+            <button class="upload-browse-btn" type="button" (click)="uploadInput.click()">Browse files</button>
+          </div>
+
+          @if (uploadQueue.length > 0) {
+            <div class="upload-list">
+              @for (item of uploadQueue; track item.file.name) {
+                <div class="upload-item">
+                  <div class="upload-item-main">
+                    <span class="upload-file-name">{{ item.file.name }}</span>
+                    <span class="upload-item-status" [class]="item.status">{{ item.status }}</span>
+                  </div>
+                  <div class="upload-item-meta">
+                    @if (item.status === 'uploading' || item.status === 'processing') {
+                      <div class="upload-progress-track">
+                        <div class="upload-progress-fill" [style.width.%]="item.progress"></div>
+                      </div>
+                    }
+                    <span class="upload-message">{{ item.message }}</span>
+                  </div>
+                  @if (!isUploading && item.status === 'queued') {
+                    <button class="upload-remove-btn" (click)="removeUploadItem($index)">Remove</button>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @if (isUploading) {
+            <div class="upload-global-progress">
+              <span>Uploading… {{ uploadGlobalProgress }}%</span>
+              <div class="upload-progress-track">
+                <div class="upload-progress-fill" [style.width.%]="uploadGlobalProgress"></div>
+              </div>
+            </div>
+          }
+
+          @if (uploadError) {
+            <div class="upload-error">{{ uploadError }}</div>
+          }
+
+          <div class="upload-actions">
+            <button class="btn btn-secondary" [disabled]="isUploading" (click)="closeUploadModal()">Close</button>
+            <button class="btn btn-primary" [disabled]="isUploading || !hasQueuedUploads" (click)="startUpload()">
+              {{ isUploading ? 'Uploading…' : 'Analyze CVs' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+  </div>
+</div>

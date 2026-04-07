@@ -1,0 +1,193 @@
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">
+      <span class="badge-dot"></span>
+      Open Beta &middot; Built for modern recruiting
+    </div>
+
+    <h1 class="hero-headline">
+      Stop reading CVs.<br />
+      <span class="gradient-text">Start hiring people.</span>
+    </h1>
+
+    <p class="hero-sub">
+      Resume Yourself ranks your candidates by fit in seconds —<br class="br-desktop" />
+      so you focus on the humans, not the paper.
+    </p>
+
+    <div class="hero-ctas">
+      <a routerLink="/upload" class="cta-primary">
+        Start Screening
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+      <a href="#how-it-works" class="cta-ghost">See how it works</a>
+    </div>
+
+    <!-- Hero visual: mock score card -->
+    <div class="hero-visual">
+      <div class="mock-card">
+        <div class="mock-header">
+          <span class="mock-title">Senior Frontend Engineer</span>
+          <span class="mock-badge">4 candidates</span>
+        </div>
+        <div class="mock-candidates">
+          <div class="mock-row rank-1">
+            <div class="mock-rank">#1</div>
+            <div class="mock-info">
+              <div class="mock-name">Alexandra M.</div>
+              <div class="mock-tags">
+                <span class="tag">React</span>
+                <span class="tag">TypeScript</span>
+                <span class="tag">GraphQL</span>
+              </div>
+            </div>
+            <div class="mock-score-wrap">
+              <div class="mock-score-bar" style="--pct: 92%"></div>
+              <span class="mock-score-num">92</span>
+            </div>
+            <div class="mock-actions">
+              <span class="action-pill approve">✓</span>
+            </div>
+          </div>
+          <div class="mock-row rank-2">
+            <div class="mock-rank">#2</div>
+            <div class="mock-info">
+              <div class="mock-name">David K.</div>
+              <div class="mock-tags">
+                <span class="tag">Vue</span>
+                <span class="tag">JavaScript</span>
+              </div>
+            </div>
+            <div class="mock-score-wrap">
+              <div class="mock-score-bar" style="--pct: 74%"></div>
+              <span class="mock-score-num">74</span>
+            </div>
+            <div class="mock-actions">
+              <span class="action-pill review">~</span>
+            </div>
+          </div>
+          <div class="mock-row rank-3">
+            <div class="mock-rank">#3</div>
+            <div class="mock-info">
+              <div class="mock-name">Sarah L.</div>
+              <div class="mock-tags">
+                <span class="tag">Angular</span>
+              </div>
+            </div>
+            <div class="mock-score-wrap">
+              <div class="mock-score-bar" style="--pct: 58%"></div>
+              <span class="mock-score-num">58</span>
+            </div>
+            <div class="mock-actions">
+              <span class="action-pill reject">✕</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="stats">
+  <div class="container">
+    <div class="stats-grid">
+      @for (stat of stats; track stat.value) {
+        <div class="stat-item">
+          <div class="stat-value">{{ stat.value }}</div>
+          <div class="stat-label">{{ stat.label }}</div>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="container">
+    <div class="section-label">What you get</div>
+    <h2 class="section-title">Everything you need to build a shortlist — nothing you don't</h2>
+
+    <div class="features-grid">
+      @for (f of features; track f.title) {
+        <div class="feature-card">
+          <div class="feature-icon">
+            @if (f.icon === 'upload') {
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+              </svg>
+            }
+            @if (f.icon === 'brain') {
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9.5 2A2.5 2.5 0 017 4.5v0A2.5 2.5 0 014.5 7H4a2 2 0 00-2 2v0a2 2 0 002 2h.5A2.5 2.5 0 017 13.5v0A2.5 2.5 0 019.5 16h5a2.5 2.5 0 002.5-2.5v0a2.5 2.5 0 012.5-2.5h.5a2 2 0 002-2v0a2 2 0 00-2-2h-.5A2.5 2.5 0 0117 4.5v0A2.5 2.5 0 0114.5 2h-5z"/>
+              </svg>
+            }
+            @if (f.icon === 'list') {
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+              </svg>
+            }
+          </div>
+          <h3 class="feature-title">{{ f.title }}</h3>
+          <p class="feature-desc">{{ f.description }}</p>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how-it-works" id="how-it-works">
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2 class="section-title">From job description to shortlist<br />in three steps</h2>
+
+    <div class="steps-grid">
+      @for (step of steps; track step.number) {
+        <div class="step-card">
+          <div class="step-number">{{ step.number }}</div>
+          <h3 class="step-title">{{ step.title }}</h3>
+          <p class="step-desc">{{ step.description }}</p>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final-cta">
+  <div class="container">
+    <div class="cta-card">
+      <div class="cta-glow"></div>
+      <h2 class="cta-title">Ready to screen 10× faster?</h2>
+      <p class="cta-sub">Paste a job description, upload CVs, get your ranked shortlist. Free during beta.</p>
+      <a routerLink="/upload" class="cta-primary large">
+        Start Screening Now
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img
+          src="/branding-logo.png"
+          alt="Resume Yourself logo"
+          class="footer-logo-image"
+          loading="lazy"
+        />
+        <span class="footer-tagline">AI-powered CV screening for modern teams.</span>
+      </div>
+      <div class="footer-copy">© 2026 Resume Yourself. Built for recruiters who value their time.</div>
+    </div>
+  </div>
+</footer>

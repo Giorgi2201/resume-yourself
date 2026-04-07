@@ -1,0 +1,209 @@
+<div class="page">
+  <div class="container">
+
+    <!-- STEPPER -->
+    <div class="stepper">
+      <div class="step-item" [class.active]="step >= 1" [class.done]="step > 1">
+        <div class="step-circle">
+          @if (step > 1) {
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          } @else { 1 }
+        </div>
+        <span class="step-label">Job Description</span>
+      </div>
+      <div class="step-connector" [class.done]="step > 1"></div>
+      <div class="step-item" [class.active]="step >= 2" [class.done]="step > 2">
+        <div class="step-circle">
+          @if (step > 2) {
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          } @else { 2 }
+        </div>
+        <span class="step-label">Upload CVs</span>
+      </div>
+      <div class="step-connector" [class.done]="step > 2"></div>
+      <div class="step-item" [class.active]="step >= 3">
+        <div class="step-circle">3</div>
+        <span class="step-label">Analyzing</span>
+      </div>
+    </div>
+
+    <!-- STEP 1: JOB DESCRIPTION -->
+    @if (step === 1) {
+      <div class="card step-card">
+        <div class="card-header">
+          <h1 class="card-title">Describe the role</h1>
+          <p class="card-sub">The more detail you add, the more accurate the candidate ranking.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="jobTitle">Job title <span class="required">*</span></label>
+          <input
+            id="jobTitle"
+            class="form-input"
+            type="text"
+            placeholder="e.g. Senior Frontend Engineer"
+            [(ngModel)]="jobTitle"
+            maxlength="120"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="jobDesc">
+            Job description <span class="required">*</span>
+            <span class="label-hint">Paste the full JD — skills, requirements, responsibilities</span>
+          </label>
+          <textarea
+            id="jobDesc"
+            class="form-textarea"
+            placeholder="We are looking for an experienced frontend engineer with strong React and TypeScript skills...&#10;&#10;Requirements:&#10;- 3+ years React experience&#10;- Strong TypeScript&#10;- GraphQL knowledge preferred&#10;..."
+            [(ngModel)]="jobDescription"
+            rows="12"
+          ></textarea>
+          <div class="char-count">{{ jobDescription.length }} characters</div>
+        </div>
+
+        @if (error) {
+          <div class="alert alert-error">{{ error }}</div>
+        }
+
+        <div class="card-actions">
+          <button
+            class="btn btn-primary"
+            [disabled]="!canProceedStep1 || isLoading"
+            (click)="submitStep1()"
+          >
+            @if (isLoading) {
+              <span class="spinner"></span> Creating...
+            } @else {
+              Continue to Upload
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            }
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- STEP 2: UPLOAD -->
+    @if (step === 2) {
+      <div class="card step-card">
+        <div class="card-header">
+          <div class="back-row">
+            <button class="btn-back" (click)="goToStep(1)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              Back
+            </button>
+          </div>
+          <h1 class="card-title">Upload candidate CVs</h1>
+          <p class="card-sub">Accepted: PDF, DOCX, TXT &middot; Upload as many as you need</p>
+        </div>
+
+        <!-- Drop zone -->
+        <div
+          class="drop-zone"
+          [class.dragging]="isDragging"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave()"
+          (drop)="onFileDrop($event)"
+          (click)="fileInput.click()"
+        >
+          <input
+            #fileInput
+            type="file"
+            multiple
+            accept=".pdf,.docx,.txt"
+            style="display:none"
+            (change)="onFileSelect($event)"
+          />
+          <div class="drop-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg>
+          </div>
+          <div class="drop-text">
+            <span class="drop-main">Drop CVs here, or <span class="drop-link">browse files</span></span>
+            <span class="drop-hint">PDF, DOCX, or TXT &middot; Multiple files supported</span>
+          </div>
+        </div>
+
+        <!-- File list -->
+        @if (files.length > 0) {
+          <div class="file-list">
+            <div class="file-list-header">
+              <span>{{ files.length }} file{{ files.length !== 1 ? 's' : '' }} selected</span>
+            </div>
+            @for (file of files; track file.name; let i = $index) {
+              <div class="file-item">
+                <div class="file-icon" [attr.data-type]="getFileIcon(file.name)">
+                  @if (getFileIcon(file.name) === 'pdf') {
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  } @else {
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                  }
+                </div>
+                <div class="file-meta">
+                  <span class="file-name">{{ file.name }}</span>
+                  <span class="file-size">{{ formatBytes(file.size) }}</span>
+                </div>
+                <button class="file-remove" (click)="removeFile(i)" aria-label="Remove">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        @if (error) {
+          <div class="alert alert-error">{{ error }}</div>
+        }
+
+        <div class="card-actions">
+          <button
+            class="btn btn-primary"
+            [disabled]="!canProceedStep2 || isLoading"
+            (click)="submitStep2()"
+          >
+            @if (isLoading) {
+              <span class="spinner"></span> Uploading...
+            } @else {
+              Analyze {{ files.length }} CV{{ files.length !== 1 ? 's' : '' }}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            }
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- STEP 3: ANALYZING -->
+    @if (step === 3) {
+      <div class="card step-card analyzing-card">
+        <div class="analyzing-icon">
+          <div class="analyzing-ring">
+            <div class="analyzing-inner">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <h2 class="analyzing-title">Scoring your candidates…</h2>
+        <p class="analyzing-sub">Parsing {{ files.length }} CV{{ files.length !== 1 ? 's' : '' }} and ranking by fit. This takes just a moment.</p>
+
+        <div class="analyzing-steps">
+          <div class="a-step done">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            Parsing job description
+          </div>
+          <div class="a-step active">
+            <span class="mini-spinner"></span>
+            Extracting CV content
+          </div>
+          <div class="a-step pending">
+            <span class="a-dot"></span>
+            Ranking candidates
+          </div>
+        </div>
+      </div>
+    }
+
+  </div>
+</div>

@@ -1,0 +1,153 @@
+<div class="page">
+  <div class="container">
+
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <div class="header-left">
+        <h1 class="page-title">Screenings</h1>
+        <p class="page-sub">All your past and active CV screening sessions.</p>
+      </div>
+      <a routerLink="/upload" class="btn-new">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Screening
+      </a>
+    </div>
+
+    <!-- LOADING -->
+    @if (isLoading) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <span>Loading your screenings…</span>
+      </div>
+    }
+
+    <!-- ERROR -->
+    @if (error && !isLoading) {
+      <div class="error-state">
+        <div class="error-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <p>{{ error }}</p>
+        <button class="btn-ghost" (click)="load()">Try again</button>
+      </div>
+    }
+
+    <!-- EMPTY STATE -->
+    @if (!isLoading && !error && screenings.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+        </div>
+        <h3 class="empty-title">No screenings yet</h3>
+        <p class="empty-sub">Create your first screening by uploading a job description and CVs.</p>
+        <p class="empty-hint">Use the <strong>New Screening</strong> button above to get started.</p>
+      </div>
+    }
+
+    <!-- SCREENINGS GRID -->
+    @if (!isLoading && !error && screenings.length > 0) {
+      <div class="screenings-grid">
+        @for (s of screenings; track trackById($index, s)) {
+          <div class="screening-card" [class.deleting]="deletingId === s.id">
+
+            <!-- DELETE CONFIRM OVERLAY -->
+            @if (confirmDeleteId === s.id) {
+              <div class="confirm-overlay" (click)="$event.stopPropagation()">
+                <p class="confirm-text">Delete this screening?</p>
+                <p class="confirm-sub">This will remove all candidates and scores.</p>
+                <div class="confirm-actions">
+                  <button class="btn-ghost-sm" (click)="cancelDelete()">Cancel</button>
+                  <button class="btn-danger-sm" (click)="confirmDelete(s.id)">Delete</button>
+                </div>
+              </div>
+            }
+
+            <div class="card-top">
+              <div class="card-title-row">
+                <h3 class="card-title">{{ s.title }}</h3>
+                <button
+                  class="btn-delete"
+                  title="Delete screening"
+                  (click)="requestDelete(s.id, $event)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                </button>
+              </div>
+              <div class="card-date">{{ formatDate(s.createdAt) }}</div>
+            </div>
+
+            <!-- STATS ROW -->
+            <div class="stats-row">
+              <div class="stat">
+                <span class="stat-num">{{ s.totalCandidates }}</span>
+                <span class="stat-lbl">candidates</span>
+              </div>
+
+              @if (s.totalCandidates > 0) {
+                <div class="stat">
+                  <span class="stat-num" [style.color]="getScoreColor(s.averageScore)">{{ s.averageScore }}</span>
+                  <span class="stat-lbl">avg score</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-num" [style.color]="getScoreColor(s.topScore)">{{ s.topScore }}</span>
+                  <span class="stat-lbl">top score</span>
+                </div>
+              }
+            </div>
+
+            <!-- FEEDBACK PILLS -->
+            @if (s.totalCandidates > 0) {
+              <div class="feedback-row">
+                @if (s.approvedCount > 0) {
+                  <span class="pill pill-approved">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                    {{ s.approvedCount }} approved
+                  </span>
+                }
+                @if (s.rejectedCount > 0) {
+                  <span class="pill pill-rejected">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    {{ s.rejectedCount }} rejected
+                  </span>
+                }
+                @if (s.totalCandidates - s.approvedCount - s.rejectedCount > 0) {
+                  <span class="pill pill-pending">
+                    {{ s.totalCandidates - s.approvedCount - s.rejectedCount }} pending
+                  </span>
+                }
+              </div>
+
+              <!-- SCORE BAR -->
+              <div class="score-bar-wrap">
+                <div class="score-bar-track">
+                  <div
+                    class="score-bar-fill"
+                    [style.width.%]="s.averageScore"
+                    [style.background]="getScoreColor(s.averageScore)"
+                  ></div>
+                </div>
+                <span class="score-bar-label" [style.color]="getScoreColor(s.averageScore)">
+                  {{ getScoreLabel(s.averageScore) }}
+                </span>
+              </div>
+            }
+
+            <!-- EMPTY CANDIDATES -->
+            @if (s.totalCandidates === 0) {
+              <div class="no-candidates">No CVs uploaded yet</div>
+            }
+
+            <!-- VIEW LINK -->
+            <a [routerLink]="['/results', s.id]" class="view-link">
+              View results
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+          </div>
+        }
+      </div>
+    }
+
+  </div>
+</div>
