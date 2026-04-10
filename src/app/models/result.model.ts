@@ -21,6 +21,7 @@ export interface CandidateResult {
 export interface ResultsResponse {
   jobId: number;
   jobTitle: string;
+  jobDescription: string;
   totalCandidates: number;
   averageScore: number;
   results: CandidateResult[];

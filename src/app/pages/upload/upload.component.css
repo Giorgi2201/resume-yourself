@@ -164,6 +164,7 @@
   transition: border-color 0.15s, box-shadow 0.15s;
   box-sizing: border-box;
   resize: none;
+  line-height: 1.55;
 }
 
 .form-input::placeholder,
@@ -183,6 +184,12 @@
   font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 0.35rem;
+}
+
+.format-hint {
+  margin-top: 0.5rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
 }
 
 /* DROP ZONE */

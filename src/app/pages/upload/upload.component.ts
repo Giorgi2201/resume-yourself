@@ -83,6 +83,29 @@ export class UploadComponent {
     return (bytes / 1048576).toFixed(1) + ' MB';
   }
 
+  onDescriptionPaste(event: ClipboardEvent) {
+    event.preventDefault();
+    const pasted = event.clipboardData?.getData('text/plain') ?? '';
+    const textarea = event.target as HTMLTextAreaElement | null;
+    if (!textarea) {
+      this.jobDescription += pasted;
+      return;
+    }
+
+    const selectionStart = textarea.selectionStart ?? this.jobDescription.length;
+    const selectionEnd = textarea.selectionEnd ?? this.jobDescription.length;
+    const normalized = pasted.replace(/\r\n?/g, '\n');
+    this.jobDescription =
+      this.jobDescription.slice(0, selectionStart) +
+      normalized +
+      this.jobDescription.slice(selectionEnd);
+
+    queueMicrotask(() => {
+      const caret = selectionStart + normalized.length;
+      textarea.setSelectionRange(caret, caret);
+    });
+  }
+
   async submitStep1() {
     if (!this.canProceedStep1) return;
     this.isLoading = true;
@@ -90,7 +113,7 @@ export class UploadComponent {
     try {
       const job = await this.api.createJob({
         title: this.jobTitle.trim(),
-        description: this.jobDescription.trim()
+        description: this.jobDescription.replace(/\r\n?/g, '\n')
       }).toPromise();
       this.createdJobId = job!.id;
       this.step = 2;

@@ -56,6 +56,7 @@ public class ResultsController(AppDbContext db, IScoringService scorer) : Contro
         {
             jobId,
             jobTitle = job.Title,
+            jobDescription = job.Description,
             totalCandidates = results.Count,
             averageScore = results.Count > 0 ? (int)results.Average(r => r.Score) : 0,
             results

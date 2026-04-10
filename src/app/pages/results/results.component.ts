@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild, inject, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HttpEventType } from '@angular/common/http';
@@ -27,6 +27,9 @@ export class ResultsComponent implements OnInit {
   uploadGlobalProgress = 0;
   uploadError = '';
   uploadQueue: UploadQueueItem[] = [];
+  isDescriptionModalOpen = false;
+  private lastFocusedBeforeDescriptionModal: HTMLElement | null = null;
+  @ViewChild('descriptionModalPanel') descriptionModalPanel?: ElementRef<HTMLDivElement>;
 
   get jobId(): number {
     return Number(this.route.snapshot.paramMap.get('jobId'));
@@ -215,6 +218,90 @@ export class ResultsComponent implements OnInit {
 
   closeDetail() {
     this.selectedCandidate = null;
+  }
+
+  openDescriptionModal() {
+    if (!this.results?.jobDescription?.trim()) return;
+    this.lastFocusedBeforeDescriptionModal = document.activeElement as HTMLElement | null;
+    this.isDescriptionModalOpen = true;
+    queueMicrotask(() => this.focusFirstDescriptionModalElement());
+  }
+
+  closeDescriptionModal() {
+    this.isDescriptionModalOpen = false;
+    this.lastFocusedBeforeDescriptionModal?.focus();
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      if (this.isDescriptionModalOpen) {
+        event.preventDefault();
+        this.closeDescriptionModal();
+        return;
+      }
+
+      if (this.isUploadModalOpen && !this.isUploading) {
+        event.preventDefault();
+        this.closeUploadModal();
+      }
+      return;
+    }
+
+    if (event.key === 'Tab' && this.isDescriptionModalOpen) {
+      this.trapDescriptionModalFocus(event);
+    }
+  }
+
+  private focusFirstDescriptionModalElement() {
+    const focusable = this.getDescriptionModalFocusableElements();
+    if (focusable.length > 0) {
+      focusable[0].focus();
+      return;
+    }
+
+    this.descriptionModalPanel?.nativeElement.focus();
+  }
+
+  private trapDescriptionModalFocus(event: KeyboardEvent) {
+    const focusable = this.getDescriptionModalFocusableElements();
+    if (focusable.length === 0) {
+      event.preventDefault();
+      this.descriptionModalPanel?.nativeElement.focus();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+
+    if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  private getDescriptionModalFocusableElements(): HTMLElement[] {
+    const root = this.descriptionModalPanel?.nativeElement;
+    if (!root) return [];
+
+    const selectors = [
+      'button:not([disabled])',
+      '[href]',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])'
+    ].join(', ');
+
+    return Array.from(root.querySelectorAll<HTMLElement>(selectors))
+      .filter(el => !el.hasAttribute('disabled') && el.tabIndex !== -1);
   }
 
   submitFeedback(candidate: CandidateResult, type: 'Approved' | 'Rejected') {

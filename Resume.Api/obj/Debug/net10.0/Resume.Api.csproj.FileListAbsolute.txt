@@ -156,3 +156,4 @@ C:\Users\Giorgi\Desktop\resume-automation\Resume.Api\obj\Debug\net10.0\refint\Re
 C:\Users\Giorgi\Desktop\resume-automation\Resume.Api\obj\Debug\net10.0\Resume.Api.pdb
 C:\Users\Giorgi\Desktop\resume-automation\Resume.Api\obj\Debug\net10.0\Resume.Api.genruntimeconfig.cache
 C:\Users\Giorgi\Desktop\resume-automation\Resume.Api\obj\Debug\net10.0\ref\Resume.Api.dll
+C:\Users\Giorgi\Desktop\resume-automation\Resume.Api\obj\Debug\net10.0\Resume.Api.sourcelink.json

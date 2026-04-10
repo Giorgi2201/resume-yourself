@@ -57,8 +57,10 @@
             class="form-textarea"
             placeholder="We are looking for an experienced frontend engineer with strong React and TypeScript skills...&#10;&#10;Requirements:&#10;- 3+ years React experience&#10;- Strong TypeScript&#10;- GraphQL knowledge preferred&#10;..."
             [(ngModel)]="jobDescription"
+            (paste)="onDescriptionPaste($event)"
             rows="12"
           ></textarea>
+          <div class="format-hint">Formatting is preserved: line breaks, spacing, and bullet points.</div>
           <div class="char-count">{{ jobDescription.length }} characters</div>
         </div>
 
