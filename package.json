@@ -7,7 +7,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr:resume-automation": "node dist/resume-automation/server/server.mjs"
+    "serve:ssr:resume-automation": "node dist/resume-automation/server/server.mjs",
+    "generate:api-types": "openapi-typescript http://localhost:5064/openapi/v1.json -o src/app/api-contract/generated.ts"
   },
   "private": true,
   "dependencies": {
@@ -38,6 +39,7 @@
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
+    "openapi-typescript": "^7.13.0",
     "typescript": "~5.7.2"
   }
 }

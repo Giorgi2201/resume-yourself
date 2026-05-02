@@ -10,6 +10,12 @@
     <div class="nav-links">
       <a routerLink="/screenings" routerLinkActive="active" class="nav-link">Screenings</a>
       <a routerLink="/upload" class="btn-primary">New Screening <span class="arrow">→</span></a>
+      @if (auth.userEmail()) {
+        <span class="user-email" [title]="auth.userEmail()!">{{ auth.userEmail() }}</span>
+        <button type="button" class="btn-ghost" (click)="logout()">Sign out</button>
+      } @else {
+        <a routerLink="/login" routerLinkActive="active" class="nav-link">Sign in</a>
+      }
     </div>
   </div>
 </nav>

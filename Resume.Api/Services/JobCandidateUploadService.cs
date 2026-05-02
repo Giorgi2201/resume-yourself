@@ -1,8 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
+using Resume.Api.Configuration;
 using Resume.Api.Data;
 using Resume.Api.DTOs;
+using Resume.Api.Exceptions;
 using Resume.Api.Models;
 
 namespace Resume.Api.Services;
@@ -10,34 +13,34 @@ namespace Resume.Api.Services;
 public class JobCandidateUploadService(
     AppDbContext db,
     ICvParserService parser,
-    IScoringService scorer) : IJobCandidateUploadService
+    IScoringService scorer,
+    IOptions<FileUploadOptions> uploadOptions) : IJobCandidateUploadService
 {
-    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".pdf", ".docx", ".txt"
-    };
 
     public async Task<CandidateUploadResponse> UploadAsync(int jobId, List<IFormFile> files)
     {
         var job = await db.Jobs.FindAsync(jobId);
-        if (job is null) throw new InvalidOperationException("Job not found.");
-        if (files is null || files.Count == 0) throw new InvalidOperationException("No files uploaded.");
+        if (job is null) throw new ApiException("Job not found.", StatusCodes.Status404NotFound);
+        if (files is null || files.Count == 0) throw new ApiException("No files uploaded.");
+        if (files.Count > uploadOptions.Value.MaxFilesPerRequest)
+            throw new ApiException($"Too many files. Maximum allowed is {uploadOptions.Value.MaxFilesPerRequest} files.");
 
         var results = new List<CandidateUploadFileResult>();
-        var createdScoreIds = new List<int>();
 
-        // Build existing hash set for duplicate protection within this job.
         var existingHashes = await db.CandidateScores
             .Where(s => s.JobId == jobId)
             .Include(s => s.Candidate)
             .Select(s => s.Candidate.ParsedText)
             .ToListAsync();
         var hashSet = existingHashes.Select(ComputeHash).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var candidatesToPersist = new List<Candidate>();
+        var stagedScores = new List<(Candidate Candidate, WeightedScoreResult Scored)>();
+        var successEntries = new List<(int CandidateId, string FileName, int Score)>();
 
         foreach (var file in files)
         {
             var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-            if (!AllowedExtensions.Contains(ext))
+            if (!uploadOptions.Value.AllowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
             {
                 results.Add(new CandidateUploadFileResult(
                     FileName: file.FileName,
@@ -47,6 +50,16 @@ public class JobCandidateUploadService(
                     Score: null,
                     Rank: null
                 ));
+                continue;
+            }
+            if (!uploadOptions.Value.AllowedMimeTypes.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))
+            {
+                results.Add(new CandidateUploadFileResult(file.FileName, "failed", $"Unsupported MIME type '{file.ContentType}'.", null, null, null));
+                continue;
+            }
+            if (file.Length <= 0 || file.Length > uploadOptions.Value.MaxFileSizeBytes)
+            {
+                results.Add(new CandidateUploadFileResult(file.FileName, "failed", $"File size must be between 1 byte and {uploadOptions.Value.MaxFileSizeBytes} bytes.", null, null, null));
                 continue;
             }
 
@@ -81,11 +94,33 @@ public class JobCandidateUploadService(
                     ExtractedSkills = string.Join(", ", parsed.ExtractedSkills),
                     UploadedAt = DateTime.UtcNow
                 };
-                db.Candidates.Add(candidate);
-                await db.SaveChangesAsync();
-
                 var scored = scorer.Score(parsed.RawText, job.Description);
-                var score = new CandidateScore
+                candidatesToPersist.Add(candidate);
+                stagedScores.Add((candidate, scored));
+                hashSet.Add(hash);
+            }
+            catch (Exception ex)
+            {
+                results.Add(new CandidateUploadFileResult(
+                    FileName: file.FileName,
+                    Status: "failed",
+                    Message: $"Failed to parse this file: {ex.Message}",
+                    CandidateId: null,
+                    Score: null,
+                    Rank: null
+                ));
+            }
+        }
+
+        if (candidatesToPersist.Count > 0)
+        {
+            await using var tx = await db.Database.BeginTransactionAsync();
+            db.Candidates.AddRange(candidatesToPersist);
+            await db.SaveChangesAsync();
+
+            foreach (var (candidate, scored) in stagedScores)
+            {
+                db.CandidateScores.Add(new CandidateScore
                 {
                     CandidateId = candidate.Id,
                     JobId = jobId,
@@ -94,51 +129,36 @@ public class JobCandidateUploadService(
                     MatchedKeywords = string.Join(",", scored.AllMatched),
                     MissingKeywords = string.Join(",", scored.AllMissing),
                     TotalJobKeywords = scored.TotalKeywords,
+                    CoreMatchedKeywords = string.Join(",", scored.CoreMatched),
+                    CoreMissingKeywords = string.Join(",", scored.CoreMissing),
+                    SecondaryMatchedKeywords = string.Join(",", scored.SecondaryMatched),
+                    SecondaryMissingKeywords = string.Join(",", scored.SecondaryMissing),
+                    HardFilters = string.Join(",", scored.HardFilters),
+                    ScoreReasons = string.Join(",", scored.Explanations),
+                    TotalCoreKeywords = scored.TotalCoreKeywords,
+                    TotalSecondaryKeywords = scored.TotalSecondaryKeywords,
                     ScoredAt = DateTime.UtcNow
-                };
-                db.CandidateScores.Add(score);
-                await db.SaveChangesAsync();
+                });
 
-                createdScoreIds.Add(score.Id);
-                hashSet.Add(hash);
-
-                results.Add(new CandidateUploadFileResult(
-                    FileName: file.FileName,
-                    Status: "completed",
-                    Message: "Processed successfully.",
-                    CandidateId: candidate.Id,
-                    Score: score.Score,
-                    Rank: null
-                ));
+                successEntries.Add((candidate.Id, candidate.FileName, scored.Score));
             }
-            catch
-            {
-                results.Add(new CandidateUploadFileResult(
-                    FileName: file.FileName,
-                    Status: "failed",
-                    Message: "Failed to parse this file.",
-                    CandidateId: null,
-                    Score: null,
-                    Rank: null
-                ));
-            }
-        }
 
-        await RecomputeRanksAsync(jobId);
+            await db.SaveChangesAsync();
+            await RecomputeRanksAsync(jobId);
+            await tx.CommitAsync();
 
-        if (createdScoreIds.Count > 0)
-        {
-            var createdScores = await db.CandidateScores
-                .Where(s => createdScoreIds.Contains(s.Id))
+            var candidateRanks = await db.CandidateScores
+                .Where(s => s.JobId == jobId)
                 .ToDictionaryAsync(s => s.CandidateId, s => s.Rank);
 
-            results = results.Select(r =>
-            {
-                if (r.CandidateId is null) return r;
-                return createdScores.TryGetValue(r.CandidateId.Value, out var rank)
-                    ? r with { Rank = rank }
-                    : r;
-            }).ToList();
+            results.AddRange(successEntries.Select(s => new CandidateUploadFileResult(
+                s.FileName,
+                "completed",
+                "Processed successfully.",
+                s.CandidateId,
+                s.Score,
+                candidateRanks.GetValueOrDefault(s.CandidateId)
+            )));
         }
 
         return new CandidateUploadResponse(

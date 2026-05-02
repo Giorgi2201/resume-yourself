@@ -1,14 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Resume.Api.Data;
 using Resume.Api.DTOs;
-using Resume.Api.Services;
 
 namespace Resume.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ResultsController(AppDbContext db, IScoringService scorer) : ControllerBase
+[Authorize]
+public class ResultsController(AppDbContext db) : ControllerBase
 {
     [HttpGet("{jobId:int}")]
     public async Task<IActionResult> GetResults(int jobId)
@@ -22,16 +23,12 @@ public class ResultsController(AppDbContext db, IScoringService scorer) : Contro
             .OrderBy(s => s.Rank)
             .ToListAsync();
 
-        var feedbacks = await db.Feedbacks
+        var feedbackByCandidate = await db.Feedbacks
             .Where(f => f.JobId == jobId)
-            .ToListAsync();
+            .ToDictionaryAsync(f => f.CandidateId, f => f.Type.ToString());
 
         var results = scores.Select(s =>
         {
-            // Re-run scoring to get the full weighted breakdown (core / secondary / hard filters)
-            var breakdown = scorer.Score(s.Candidate.ParsedText, job.Description);
-            var feedback = feedbacks.FirstOrDefault(f => f.CandidateId == s.CandidateId);
-
             return new CandidateResultResponse(
                 s.CandidateId,
                 s.Id,
@@ -40,15 +37,15 @@ public class ResultsController(AppDbContext db, IScoringService scorer) : Contro
                 s.Candidate.FileName,
                 s.Score,
                 s.Rank,
-                breakdown.CoreMatched,
-                breakdown.CoreMissing,
-                breakdown.SecondaryMatched,
-                breakdown.SecondaryMissing,
-                breakdown.HardFilters,
-                breakdown.Explanations,
-                breakdown.TotalCoreKeywords,
-                breakdown.TotalSecondaryKeywords,
-                feedback?.Type.ToString()
+                SplitCsv(s.CoreMatchedKeywords),
+                SplitCsv(s.CoreMissingKeywords),
+                SplitCsv(s.SecondaryMatchedKeywords),
+                SplitCsv(s.SecondaryMissingKeywords),
+                SplitCsv(s.HardFilters),
+                SplitCsv(s.ScoreReasons),
+                s.TotalCoreKeywords,
+                s.TotalSecondaryKeywords,
+                feedbackByCandidate.GetValueOrDefault(s.CandidateId)
             );
         }).ToList();
 
@@ -62,4 +59,7 @@ public class ResultsController(AppDbContext db, IScoringService scorer) : Contro
             results
         });
     }
+
+    private static List<string> SplitCsv(string csv) =>
+        csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 }

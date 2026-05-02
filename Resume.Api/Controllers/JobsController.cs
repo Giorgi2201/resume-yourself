@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Resume.Api.Data;
 using Resume.Api.DTOs;
+using Resume.Api.Exceptions;
 using Resume.Api.Models;
 using Resume.Api.Services;
 
@@ -9,7 +11,8 @@ namespace Resume.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class JobsController(AppDbContext db, IJobCandidateUploadService uploadService) : ControllerBase
+[Authorize]
+public class JobsController(AppDbContext db, IJobCandidateUploadService uploadService, IAuditService auditService) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAll()
@@ -24,35 +27,53 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
     [HttpGet("summary")]
     public async Task<IActionResult> GetSummary()
     {
+        // Avoid joining grouped IQueryable subqueries (poorly supported / fails on SQLite).
         var jobs = await db.Jobs
             .OrderByDescending(j => j.CreatedAt)
+            .Select(j => new { j.Id, j.Title, j.CreatedAt })
             .ToListAsync();
 
-        var result = new List<object>();
-        foreach (var job in jobs)
-        {
-            var scores = await db.CandidateScores
-                .Where(s => s.JobId == job.Id)
-                .ToListAsync();
-
-            var feedbacks = await db.Feedbacks
-                .Where(f => f.JobId == job.Id)
-                .ToListAsync();
-
-            result.Add(new
+        var scoreRows = await db.CandidateScores
+            .GroupBy(s => s.JobId)
+            .Select(g => new
             {
-                job.Id,
-                job.Title,
-                job.CreatedAt,
-                TotalCandidates = scores.Count,
-                AverageScore = scores.Count > 0 ? (int)scores.Average(s => s.Score) : 0,
-                TopScore = scores.Count > 0 ? scores.Max(s => s.Score) : 0,
-                ApprovedCount = feedbacks.Count(f => f.Type == FeedbackType.Approved),
-                RejectedCount = feedbacks.Count(f => f.Type == FeedbackType.Rejected),
-            });
-        }
+                JobId = g.Key,
+                TotalCandidates = g.Count(),
+                AverageScore = g.Average(x => x.Score),
+                TopScore = g.Max(x => x.Score)
+            })
+            .ToListAsync();
 
-        return Ok(result);
+        var feedbackRows = await db.Feedbacks
+            .GroupBy(f => f.JobId)
+            .Select(g => new
+            {
+                JobId = g.Key,
+                ApprovedCount = g.Count(x => x.Type == FeedbackType.Approved),
+                RejectedCount = g.Count(x => x.Type == FeedbackType.Rejected)
+            })
+            .ToListAsync();
+
+        var scoresByJob = scoreRows.ToDictionary(x => x.JobId);
+        var feedbackByJob = feedbackRows.ToDictionary(x => x.JobId);
+
+        var summary = jobs.Select(j =>
+        {
+            scoresByJob.TryGetValue(j.Id, out var s);
+            feedbackByJob.TryGetValue(j.Id, out var f);
+            return new JobSummaryResponse(
+                j.Id,
+                j.Title,
+                j.CreatedAt,
+                s?.TotalCandidates ?? 0,
+                s != null ? (int)Math.Round(s.AverageScore) : 0,
+                s?.TopScore ?? 0,
+                f?.ApprovedCount ?? 0,
+                f?.RejectedCount ?? 0
+            );
+        }).ToList();
+
+        return Ok(summary);
     }
 
     [HttpGet("{id:int}")]
@@ -66,6 +87,9 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateJobRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.Description) || request.Description.Length < 20)
+            throw new ApiException("Job description must be at least 20 characters.");
+
         var job = new Job
         {
             Title = request.Title,
@@ -73,6 +97,7 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
         };
         db.Jobs.Add(job);
         await db.SaveChangesAsync();
+        await auditService.LogAsync("job.created", "job", job.Id.ToString(), $"title={job.Title}");
         return CreatedAtAction(nameof(GetById), new { id = job.Id },
             new JobResponse(job.Id, job.Title, job.Description, job.CreatedAt));
     }
@@ -84,22 +109,15 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
         if (job is null) return NotFound();
         db.Jobs.Remove(job);
         await db.SaveChangesAsync();
+        await auditService.LogAsync("job.deleted", "job", job.Id.ToString(), $"title={job.Title}");
         return NoContent();
     }
 
     [HttpPost("{jobId:int}/candidates/upload")]
     public async Task<IActionResult> UploadCandidates(int jobId, [FromForm] List<IFormFile> files)
     {
-        try
-        {
-            var response = await uploadService.UploadAsync(jobId, files);
-            return Ok(response);
-        }
-        catch (InvalidOperationException ex)
-        {
-            if (ex.Message.Contains("Job not found", StringComparison.OrdinalIgnoreCase))
-                return NotFound(new { message = ex.Message });
-            return BadRequest(new { message = ex.Message });
-        }
+        var response = await uploadService.UploadAsync(jobId, files);
+        await auditService.LogAsync("candidates.uploaded", "job", jobId.ToString(), $"processed={response.ProcessedCount}, failed={response.FailedCount}");
+        return Ok(response);
     }
 }

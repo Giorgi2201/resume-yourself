@@ -1,20 +1,24 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Resume.Api.Data;
 using Resume.Api.DTOs;
+using Resume.Api.Exceptions;
 using Resume.Api.Models;
+using Resume.Api.Services;
 
 namespace Resume.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class FeedbackController(AppDbContext db) : ControllerBase
+[Authorize]
+public class FeedbackController(AppDbContext db, IAuditService auditService) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Submit([FromBody] FeedbackRequest request)
     {
         if (!Enum.TryParse<FeedbackType>(request.Type, true, out var feedbackType))
-            return BadRequest(new { message = "Invalid feedback type. Use 'Approved' or 'Rejected'." });
+            throw new ApiException("Invalid feedback type. Use 'Approved' or 'Rejected'.");
 
         var existing = await db.Feedbacks
             .FirstOrDefaultAsync(f => f.CandidateId == request.CandidateId && f.JobId == request.JobId);
@@ -35,6 +39,7 @@ public class FeedbackController(AppDbContext db) : ControllerBase
         }
 
         await db.SaveChangesAsync();
+        await auditService.LogAsync("feedback.saved", "job", request.JobId.ToString(), $"candidateId={request.CandidateId}, type={feedbackType}");
         return Ok(new { message = "Feedback saved.", type = feedbackType.ToString() });
     }
 
@@ -47,6 +52,7 @@ public class FeedbackController(AppDbContext db) : ControllerBase
 
         db.Feedbacks.Remove(feedback);
         await db.SaveChangesAsync();
+        await auditService.LogAsync("feedback.removed", "job", jobId.ToString(), $"candidateId={candidateId}");
         return NoContent();
     }
 }

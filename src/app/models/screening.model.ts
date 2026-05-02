@@ -1,10 +1,1 @@
-export interface ScreeningSummary {
-  id: number;
-  title: string;
-  createdAt: string;
-  totalCandidates: number;
-  averageScore: number;
-  topScore: number;
-  approvedCount: number;
-  rejectedCount: number;
-}
+export type { JobSummaryResponse as ScreeningSummary } from '../api-contract/generated';

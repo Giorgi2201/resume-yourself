@@ -1,0 +1,7 @@
+namespace Resume.Api.Configuration;
+
+public class CorsOptions
+{
+    public const string SectionName = "Cors";
+    public List<string> AllowedOrigins { get; init; } = [];
+}

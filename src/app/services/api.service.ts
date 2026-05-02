@@ -4,11 +4,12 @@ import { Observable } from 'rxjs';
 import { Job, CreateJobRequest } from '../models/job.model';
 import { ResultsResponse, FeedbackRequest, UploadResponse } from '../models/result.model';
 import { ScreeningSummary } from '../models/screening.model';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = 'http://localhost:5064/api';
+  private readonly baseUrl = environment.apiBaseUrl;
 
   // Jobs
   getJobs(): Observable<Job[]> {

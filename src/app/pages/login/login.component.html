@@ -1,0 +1,45 @@
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-header">
+      <p class="eyebrow">Resume Yourself</p>
+      <h1>Sign in</h1>
+      <p class="sub">Use your team account to manage screenings and results.</p>
+    </div>
+
+    @if (errorMessage()) {
+      <div class="alert" role="alert">{{ errorMessage() }}</div>
+    }
+
+    <form (ngSubmit)="submit()" class="form">
+      <label class="field">
+        <span>Work email</span>
+        <input
+          type="email"
+          name="email"
+          [(ngModel)]="email"
+          autocomplete="username"
+          required
+          placeholder="you@company.com"
+        />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input
+          type="password"
+          name="password"
+          [(ngModel)]="password"
+          autocomplete="current-password"
+          required
+          placeholder="••••••••"
+        />
+      </label>
+      <button type="submit" class="submit" [disabled]="loading()">
+        {{ loading() ? 'Signing in…' : 'Continue' }}
+      </button>
+    </form>
+
+    <p class="footer">
+      <a routerLink="/" class="link">← Back to home</a>
+    </p>
+  </div>
+</div>

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Resume.Api.DTOs;
 
 public record CandidateResultResponse(
@@ -20,4 +22,8 @@ public record CandidateResultResponse(
     string? FeedbackType
 );
 
-public record FeedbackRequest(int CandidateId, int JobId, string Type);
+public record FeedbackRequest(
+    [Range(1, int.MaxValue)] int CandidateId,
+    [Range(1, int.MaxValue)] int JobId,
+    [Required, RegularExpression("^(Approved|Rejected)$", ErrorMessage = "Type must be Approved or Rejected.")] string Type
+);

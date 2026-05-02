@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using DocumentFormat.OpenXml.Packaging;
+using Resume.Api.Exceptions;
 using Resume.Api.Services.NameExtraction;
 using UglyToad.PdfPig;
 
@@ -34,29 +35,40 @@ public partial class CvParserService(INameExtractionService nameExtractor) : ICv
 
     public async Task<ParsedCv> ParseAsync(IFormFile file)
     {
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        var rawText = extension switch
+        try
         {
-            ".pdf" => await ExtractPdfTextAsync(file),
-            ".docx" => await ExtractDocxTextAsync(file),
-            ".txt" => await ExtractPlainTextAsync(file),
-            _ => await ExtractPlainTextAsync(file)
-        };
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var rawText = extension switch
+            {
+                ".pdf" => await ExtractPdfTextAsync(file),
+                ".docx" => await ExtractDocxTextAsync(file),
+                ".txt" => await ExtractPlainTextAsync(file),
+                _ => throw new FileParsingException($"Unsupported file extension '{extension}'.")
+            };
 
-        var email = ExtractEmail(rawText);
-        var skills = ExtractSkills(rawText);
-        var extractedName = nameExtractor.Extract(rawText, email, file.FileName);
+            var email = ExtractEmail(rawText);
+            var skills = ExtractSkills(rawText);
+            var extractedName = nameExtractor.Extract(rawText, email, file.FileName);
 
-        return new ParsedCv(
-            RawText: rawText,
-            Name: extractedName.FullName,
-            Email: email,
-            ExtractedSkills: skills,
-            FirstName: extractedName.FirstName,
-            LastName: extractedName.LastName,
-            NameConfidenceScore: extractedName.ConfidenceScore,
-            NameSource: extractedName.Source
-        );
+            return new ParsedCv(
+                RawText: rawText,
+                Name: extractedName.FullName,
+                Email: email,
+                ExtractedSkills: skills,
+                FirstName: extractedName.FirstName,
+                LastName: extractedName.LastName,
+                NameConfidenceScore: extractedName.ConfidenceScore,
+                NameSource: extractedName.Source
+            );
+        }
+        catch (FileParsingException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new FileParsingException($"Failed to parse '{file.FileName}'.", ex);
+        }
     }
 
     private static async Task<string> ExtractPdfTextAsync(IFormFile file)
