@@ -45,3 +45,11 @@ Thumbs.db
 *.db
 *.db-shm
 *.db-wal
+
+# Local secrets — never commit real credentials
+# Copy appsettings.Development.example.json → appsettings.Development.json and fill in your values.
+Resume.Api/appsettings.Development.json
+
+# .NET build output
+Resume.Api/bin/
+Resume.Api/obj/
