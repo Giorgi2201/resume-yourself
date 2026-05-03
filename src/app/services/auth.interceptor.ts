@@ -4,7 +4,14 @@ import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 
 function isAuthEndpoint(url: string): boolean {
-  return url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/logout');
+  return (
+    url.includes('/auth/login') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/logout') ||
+    url.includes('/auth/register') ||
+    url.includes('/auth/verify-email') ||
+    url.includes('/auth/resend-verification')
+  );
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {

@@ -17,9 +17,9 @@ public class JobCandidateUploadService(
     IOptions<FileUploadOptions> uploadOptions) : IJobCandidateUploadService
 {
 
-    public async Task<CandidateUploadResponse> UploadAsync(int jobId, List<IFormFile> files)
+    public async Task<CandidateUploadResponse> UploadAsync(int jobId, string userId, List<IFormFile> files)
     {
-        var job = await db.Jobs.FindAsync(jobId);
+        var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == jobId && j.UserId == userId);
         if (job is null) throw new ApiException("Job not found.", StatusCodes.Status404NotFound);
         if (files is null || files.Count == 0) throw new ApiException("No files uploaded.");
         if (files.Count > uploadOptions.Value.MaxFilesPerRequest)

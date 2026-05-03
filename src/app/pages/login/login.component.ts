@@ -18,15 +18,23 @@ export class LoginComponent {
 
   email = '';
   password = '';
+
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly showResend = signal(false);
+  readonly resendLoading = signal(false);
+  readonly resendSuccess = signal(false);
 
   submit(): void {
     this.errorMessage.set(null);
+    this.showResend.set(false);
+    this.resendSuccess.set(false);
+
     if (!this.email.trim() || !this.password) {
-      this.errorMessage.set('Enter your work email and password.');
+      this.errorMessage.set('Enter your email and password.');
       return;
     }
+
     this.loading.set(true);
     this.auth
       .login(this.email, this.password)
@@ -36,8 +44,31 @@ export class LoginComponent {
           const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '/screenings';
           void this.router.navigateByUrl(returnUrl);
         },
-        error: (err: { error?: { detail?: string } }) => {
-          this.errorMessage.set(err?.error?.detail ?? 'Sign-in failed. Check your credentials and try again.');
+        error: (err: { error?: { detail?: string }; status?: number }) => {
+          const detail = err?.error?.detail ?? '';
+          if (detail.toLowerCase().includes('not verified')) {
+            this.errorMessage.set(detail);
+            this.showResend.set(true);
+          } else {
+            this.errorMessage.set(detail || 'Sign-in failed. Check your credentials and try again.');
+          }
+        }
+      });
+  }
+
+  resendVerification(): void {
+    if (!this.email.trim()) return;
+    this.resendLoading.set(true);
+    this.auth
+      .resendVerification(this.email)
+      .pipe(finalize(() => this.resendLoading.set(false)))
+      .subscribe({
+        next: () => {
+          this.resendSuccess.set(true);
+          this.showResend.set(false);
+        },
+        error: () => {
+          this.errorMessage.set('Could not resend the email. Please try again later.');
         }
       });
   }

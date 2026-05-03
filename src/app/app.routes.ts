@@ -15,6 +15,17 @@ export const routes: Routes = [
       import('./pages/login/login.component').then(m => m.LoginComponent)
   },
   {
+    path: 'register',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./pages/register/register.component').then(m => m.RegisterComponent)
+  },
+  {
+    path: 'verify-email',
+    loadComponent: () =>
+      import('./pages/verify-email/verify-email.component').then(m => m.VerifyEmailComponent)
+  },
+  {
     path: 'screenings',
     canActivate: [authGuard],
     loadComponent: () =>

@@ -17,11 +17,96 @@ namespace Resume.Api.Services;
 public class AuthService(
     UserManager<ApplicationUser> userManager,
     AppDbContext db,
-    IOptions<JwtOptions> jwtOptions) : IAuthService
+    IOptions<JwtOptions> jwtOptions,
+    IOptions<EmailOptions> emailOptions,
+    IEmailService emailService) : IAuthService
 {
     private readonly JwtOptions _jwt = jwtOptions.Value;
+    private readonly EmailOptions _email = emailOptions.Value;
 
-    public async Task<AuthTokensResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
+    // ──────────────────────────────────────────────────────────────
+    // Registration
+    // ──────────────────────────────────────────────────────────────
+
+    public async Task<MessageResponse> RegisterAsync(
+        RegisterRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.Password != request.ConfirmPassword)
+            throw new ApiException("Passwords do not match.", StatusCodes.Status400BadRequest);
+
+        var email = request.Email.Trim().ToLowerInvariant();
+
+        var existing = await userManager.FindByEmailAsync(email);
+        if (existing is not null)
+        {
+            // Don't reveal whether the account exists — same success message.
+            return new MessageResponse("If that address is new, a verification email has been sent.");
+        }
+
+        var user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = false
+        };
+
+        var createResult = await userManager.CreateAsync(user, request.Password);
+        if (!createResult.Succeeded)
+        {
+            var errors = string.Join(" ", createResult.Errors.Select(e => e.Description));
+            throw new ApiException(errors, StatusCodes.Status422UnprocessableEntity);
+        }
+
+        await userManager.AddToRoleAsync(user, "User");
+
+        await SendVerificationLinkAsync(user, cancellationToken);
+
+        return new MessageResponse("Registration successful. Please check your email to verify your account.");
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Email verification
+    // ──────────────────────────────────────────────────────────────
+
+    public async Task VerifyEmailAsync(
+        VerifyEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByEmailAsync(request.Email.Trim());
+        if (user is null)
+            throw new ApiException("Invalid verification link.", StatusCodes.Status400BadRequest);
+
+        if (user.EmailConfirmed)
+            throw new ApiException("This email address is already verified.", StatusCodes.Status400BadRequest);
+
+        var result = await userManager.ConfirmEmailAsync(user, request.Token);
+        if (!result.Succeeded)
+            throw new ApiException(
+                "The verification link is invalid or has expired.",
+                StatusCodes.Status400BadRequest);
+    }
+
+    public async Task ResendVerificationEmailAsync(
+        ResendVerificationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByEmailAsync(request.Email.Trim());
+
+        // Always return success to avoid user enumeration.
+        if (user is null || user.EmailConfirmed)
+            return;
+
+        await SendVerificationLinkAsync(user, cancellationToken);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Login
+    // ──────────────────────────────────────────────────────────────
+
+    public async Task<AuthTokensResponse> LoginAsync(
+        LoginRequest request,
+        CancellationToken cancellationToken = default)
     {
         var user = await userManager.FindByEmailAsync(request.Email.Trim());
         if (user is null)
@@ -37,11 +122,22 @@ public class AuthService(
             throw new ApiException("Invalid email or password.", StatusCodes.Status401Unauthorized);
         }
 
+        if (!user.EmailConfirmed)
+            throw new ApiException(
+                "Email address is not verified. Please check your inbox.",
+                StatusCodes.Status403Forbidden);
+
         await userManager.ResetAccessFailedCountAsync(user);
         return await IssueTokensAsync(user, cancellationToken);
     }
 
-    public async Task<AuthTokensResponse> RefreshAsync(RefreshTokenRequest request, CancellationToken cancellationToken = default)
+    // ──────────────────────────────────────────────────────────────
+    // Refresh / Revoke
+    // ──────────────────────────────────────────────────────────────
+
+    public async Task<AuthTokensResponse> RefreshAsync(
+        RefreshTokenRequest request,
+        CancellationToken cancellationToken = default)
     {
         var hash = HashToken(request.RefreshToken);
         var existing = await db.Set<RefreshToken>()
@@ -83,7 +179,10 @@ public class AuthService(
             roles);
     }
 
-    public async Task RevokeAsync(string userId, string? refreshTokenPlain, CancellationToken cancellationToken = default)
+    public async Task RevokeAsync(
+        string userId,
+        string? refreshTokenPlain,
+        CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(refreshTokenPlain))
         {
@@ -106,7 +205,9 @@ public class AuthService(
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RevokeByRefreshTokenAsync(string refreshTokenPlain, CancellationToken cancellationToken = default)
+    public async Task RevokeByRefreshTokenAsync(
+        string refreshTokenPlain,
+        CancellationToken cancellationToken = default)
     {
         var hash = HashToken(refreshTokenPlain);
         var token = await db.Set<RefreshToken>()
@@ -117,7 +218,24 @@ public class AuthService(
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<AuthTokensResponse> IssueTokensAsync(ApplicationUser user, CancellationToken cancellationToken)
+    // ──────────────────────────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────────────────────────
+
+    private async Task SendVerificationLinkAsync(
+        ApplicationUser user,
+        CancellationToken cancellationToken)
+    {
+        var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
+        var encodedToken = Uri.EscapeDataString(token);
+        var encodedEmail = Uri.EscapeDataString(user.Email!);
+        var link = $"{_email.AppBaseUrl.TrimEnd('/')}/verify-email?email={encodedEmail}&token={encodedToken}";
+        await emailService.SendVerificationEmailAsync(user.Email!, link, cancellationToken);
+    }
+
+    private async Task<AuthTokensResponse> IssueTokensAsync(
+        ApplicationUser user,
+        CancellationToken cancellationToken)
     {
         var refreshPlain = GenerateSecureToken();
         var refreshHash = HashToken(refreshPlain);
@@ -145,7 +263,9 @@ public class AuthService(
             roles);
     }
 
-    private Task<(string Token, DateTime ExpiresAtUtc)> CreateAccessTokenAsync(ApplicationUser user, IList<string> roles)
+    private Task<(string Token, DateTime ExpiresAtUtc)> CreateAccessTokenAsync(
+        ApplicationUser user,
+        IList<string> roles)
     {
         var claims = new List<Claim>
         {

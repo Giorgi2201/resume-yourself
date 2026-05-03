@@ -10,12 +10,16 @@ const ACCESS_KEY = 'auth_token';
 const REFRESH_KEY = 'auth_refresh_token';
 const EMAIL_KEY = 'auth_email';
 
+export interface MessageResponse {
+  message: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly router = inject(Router);
   private readonly httpBackend = inject(HttpBackend);
-  /** Bypasses interceptors — used for refresh to avoid recursion. */
+  /** Bypasses interceptors — used for auth calls to avoid recursion. */
   private readonly rawHttp = new HttpClient(this.httpBackend);
 
   readonly userEmail = signal<string | null>(null);
@@ -29,17 +33,15 @@ export class AuthService {
     this.userEmail.set(localStorage.getItem(EMAIL_KEY));
   }
 
+  // ── Token accessors ──────────────────────────────────────────────────────
+
   getAccessToken(): string | null {
-    if (!isPlatformBrowser(this.platformId)) {
-      return null;
-    }
+    if (!isPlatformBrowser(this.platformId)) return null;
     return localStorage.getItem(ACCESS_KEY);
   }
 
   getRefreshToken(): string | null {
-    if (!isPlatformBrowser(this.platformId)) {
-      return null;
-    }
+    if (!isPlatformBrowser(this.platformId)) return null;
     return localStorage.getItem(REFRESH_KEY);
   }
 
@@ -59,6 +61,29 @@ export class AuthService {
     return this.refreshSession().pipe(map(() => void 0));
   }
 
+  // ── Auth actions ─────────────────────────────────────────────────────────
+
+  register(email: string, password: string, confirmPassword: string): Observable<MessageResponse> {
+    return this.rawHttp.post<MessageResponse>(`${environment.apiBaseUrl}/auth/register`, {
+      email: email.trim(),
+      password,
+      confirmPassword
+    });
+  }
+
+  verifyEmail(email: string, token: string): Observable<MessageResponse> {
+    return this.rawHttp.post<MessageResponse>(`${environment.apiBaseUrl}/auth/verify-email`, {
+      email,
+      token
+    });
+  }
+
+  resendVerification(email: string): Observable<MessageResponse> {
+    return this.rawHttp.post<MessageResponse>(`${environment.apiBaseUrl}/auth/resend-verification`, {
+      email: email.trim()
+    });
+  }
+
   login(email: string, password: string): Observable<AuthTokensResponse> {
     return this.rawHttp
       .post<AuthTokensResponse>(`${environment.apiBaseUrl}/auth/login`, {
@@ -74,7 +99,7 @@ export class AuthService {
   }
 
   /**
-   * Shared refresh — concurrent 401s wait on the same in-flight refresh.
+   * Shared refresh — concurrent 401s wait on the same in-flight request.
    */
   refreshSession(): Observable<AuthTokensResponse> {
     if (!isPlatformBrowser(this.platformId)) {
@@ -132,10 +157,10 @@ export class AuthService {
       );
   }
 
+  // ── Session helpers ──────────────────────────────────────────────────────
+
   private persistSession(res: AuthTokensResponse): void {
-    if (!isPlatformBrowser(this.platformId)) {
-      return;
-    }
+    if (!isPlatformBrowser(this.platformId)) return;
     localStorage.setItem(ACCESS_KEY, res.accessToken);
     localStorage.setItem(REFRESH_KEY, res.refreshToken);
     localStorage.setItem(EMAIL_KEY, res.email);
@@ -143,9 +168,7 @@ export class AuthService {
   }
 
   clearLocalSession(): void {
-    if (!isPlatformBrowser(this.platformId)) {
-      return;
-    }
+    if (!isPlatformBrowser(this.platformId)) return;
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem(EMAIL_KEY);
@@ -155,9 +178,7 @@ export class AuthService {
   private isAccessTokenExpired(token: string): boolean {
     try {
       const payload = JSON.parse(atob(token.split('.')[1])) as { exp?: number };
-      if (!payload.exp) {
-        return true;
-      }
+      if (!payload.exp) return true;
       const skewMs = 15_000;
       return payload.exp * 1000 < Date.now() + skewMs;
     } catch {

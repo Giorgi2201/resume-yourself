@@ -1,0 +1,79 @@
+<div class="auth-page">
+  <div class="auth-card">
+
+    @if (successEmail()) {
+      <div class="success-state">
+        <div class="success-icon">✉</div>
+        <h1>Check your email</h1>
+        <p class="sub">
+          We've sent a verification link to <strong>{{ successEmail() }}</strong>.
+          Click the link in the email to activate your account.
+        </p>
+        <p class="hint">Didn't receive it? Check your spam folder.</p>
+        <a routerLink="/login" class="btn-primary">Go to sign in</a>
+      </div>
+    } @else {
+
+      <div class="auth-header">
+        <p class="eyebrow">Resume Automation</p>
+        <h1>Create account</h1>
+        <p class="sub">Register with your work email to get started.</p>
+      </div>
+
+      @if (errorMessage()) {
+        <div class="alert" role="alert">{{ errorMessage() }}</div>
+      }
+
+      <form (ngSubmit)="submit()" class="form" novalidate>
+        <label class="field">
+          <span>Work email</span>
+          <input
+            type="email"
+            name="email"
+            [(ngModel)]="email"
+            autocomplete="email"
+            required
+            placeholder="you@company.com"
+          />
+        </label>
+
+        <label class="field">
+          <span>Password</span>
+          <input
+            type="password"
+            name="password"
+            [(ngModel)]="password"
+            autocomplete="new-password"
+            required
+            placeholder="At least 10 characters"
+          />
+        </label>
+
+        <label class="field">
+          <span>Confirm password</span>
+          <input
+            type="password"
+            name="confirmPassword"
+            [(ngModel)]="confirmPassword"
+            autocomplete="new-password"
+            required
+            placeholder="Repeat your password"
+          />
+        </label>
+
+        <p class="password-rules">
+          Must be 10+ characters with uppercase, lowercase, digit, and symbol.
+        </p>
+
+        <button type="submit" class="submit" [disabled]="loading()">
+          {{ loading() ? 'Creating account…' : 'Create account' }}
+        </button>
+      </form>
+
+      <p class="footer">
+        Already have an account? <a routerLink="/login" class="link">Sign in</a>
+      </p>
+    }
+
+  </div>
+</div>

@@ -17,6 +17,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     {
         base.OnModelCreating(modelBuilder);
 
+        modelBuilder.Entity<Job>()
+            .HasOne(j => j.User)
+            .WithMany()
+            .HasForeignKey(j => j.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Job>()
+            .HasIndex(j => j.UserId);
+
         modelBuilder.Entity<CandidateScore>()
             .HasOne(s => s.Candidate)
             .WithMany(c => c.Scores)
