@@ -41,7 +41,7 @@ export class ResultsComponent implements OnInit {
 
   loadResults() {
     this.isLoading = true;
-    this.api.getResults(this.jobId).subscribe({
+    this.api.getResults(this.jobId, 1, 50).subscribe({
       next: data => {
         this.results = data;
         this.isLoading = false;
@@ -191,7 +191,7 @@ export class ResultsComponent implements OnInit {
   }
 
   private refreshResultsAfterUpload() {
-    this.api.getResults(this.jobId).subscribe({
+    this.api.getResults(this.jobId, 1, 50).subscribe({
       next: latest => {
         const selectedId = this.selectedCandidate?.candidateId ?? null;
         this.results = latest;

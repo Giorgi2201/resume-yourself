@@ -3,35 +3,13 @@ using System.Text.RegularExpressions;
 using DocumentFormat.OpenXml.Packaging;
 using Resume.Api.Exceptions;
 using Resume.Api.Services.NameExtraction;
+using Resume.Api.Services.Scoring;
 using UglyToad.PdfPig;
 
 namespace Resume.Api.Services;
 
 public partial class CvParserService(INameExtractionService nameExtractor) : ICvParserService
 {
-    private static readonly HashSet<string> KnownSkills = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "javascript", "typescript", "python", "java", "c#", "c++", "c", "go", "rust",
-        "ruby", "php", "swift", "kotlin", "scala", "r", "matlab", "perl", "haskell",
-        "dart", "elixir", "clojure", "f#", "vb.net", "groovy", "lua", "shell", "bash",
-        "react", "angular", "vue", "svelte", "next.js", "nuxt", "gatsby", "ember",
-        "html", "css", "sass", "scss", "tailwind", "bootstrap", "material ui",
-        "redux", "mobx", "rxjs", "graphql", "webpack", "vite",
-        "node.js", "express", "fastapi", "django", "flask", "spring", "asp.net",
-        ".net", "laravel", "rails", "gin", "fiber", "nestjs", "hapi",
-        "sql", "postgresql", "mysql", "sqlite", "mongodb", "redis", "elasticsearch",
-        "cassandra", "dynamodb", "firebase", "supabase", "oracle", "mssql",
-        "aws", "azure", "gcp", "docker", "kubernetes", "terraform", "ansible",
-        "jenkins", "github actions", "gitlab ci", "ci/cd", "linux", "nginx",
-        "prometheus", "grafana", "helm", "argo", "pulumi",
-        "machine learning", "deep learning", "tensorflow", "pytorch", "keras",
-        "scikit-learn", "pandas", "numpy", "spark", "airflow", "kafka", "hadoop",
-        "data science", "nlp", "computer vision", "llm", "openai", "langchain",
-        "git", "agile", "scrum", "kanban", "jira", "confluence", "figma",
-        "microservices", "rest", "api", "grpc", "oauth", "jwt",
-        "tdd", "bdd", "unit testing", "integration testing", "solid", "clean architecture",
-        "android", "ios", "react native", "flutter", "xamarin",
-    };
 
     public async Task<ParsedCv> ParseAsync(IFormFile file)
     {
@@ -117,7 +95,7 @@ public partial class CvParserService(INameExtractionService nameExtractor) : ICv
     private static List<string> ExtractSkills(string text)
     {
         var lower = text.ToLowerInvariant();
-        return [.. KnownSkills.Where(skill => lower.Contains(skill.ToLowerInvariant()))];
+        return [.. SkillOntology.AllCanonicals.Where(canonical => lower.Contains(canonical))];
     }
 
     [GeneratedRegex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")]

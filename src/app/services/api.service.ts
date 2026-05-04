@@ -12,8 +12,10 @@ export class ApiService {
   private readonly baseUrl = environment.apiBaseUrl;
 
   // Jobs
-  getJobs(): Observable<Job[]> {
-    return this.http.get<Job[]>(`${this.baseUrl}/jobs`);
+  getJobs(page = 1, pageSize = 20): Observable<Job[]> {
+    return this.http.get<Job[]>(`${this.baseUrl}/jobs`, {
+      params: { page: page.toString(), pageSize: pageSize.toString() }
+    });
   }
 
   getScreeningsSummary(): Observable<ScreeningSummary[]> {
@@ -33,13 +35,6 @@ export class ApiService {
   }
 
   // Candidates
-  uploadCandidates(jobId: number, files: File[]): Observable<UploadResponse> {
-    const form = new FormData();
-    form.append('jobId', jobId.toString());
-    files.forEach(f => form.append('files', f));
-    return this.http.post<UploadResponse>(`${this.baseUrl}/candidates/upload`, form);
-  }
-
   uploadCandidatesForExistingJob(jobId: number, files: File[]): Observable<HttpEvent<UploadResponse>> {
     const form = new FormData();
     files.forEach(f => form.append('files', f));
@@ -57,8 +52,10 @@ export class ApiService {
   }
 
   // Results
-  getResults(jobId: number): Observable<ResultsResponse> {
-    return this.http.get<ResultsResponse>(`${this.baseUrl}/results/${jobId}`);
+  getResults(jobId: number, page = 1, pageSize = 50): Observable<ResultsResponse> {
+    return this.http.get<ResultsResponse>(`${this.baseUrl}/results/${jobId}`, {
+      params: { page: page.toString(), pageSize: pageSize.toString() }
+    });
   }
 
   // Feedback

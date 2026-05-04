@@ -13,7 +13,10 @@ namespace Resume.Api.Controllers;
 public class ResultsController(AppDbContext db) : ControllerBase
 {
     [HttpGet("{jobId:int}")]
-    public async Task<IActionResult> GetResults(int jobId)
+    public async Task<IActionResult> GetResults(
+        int jobId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
     {
         var userId = User.GetUserId();
 
@@ -21,10 +24,19 @@ public class ResultsController(AppDbContext db) : ControllerBase
         var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == jobId && j.UserId == userId);
         if (job is null) return NotFound();
 
-        var scores = await db.CandidateScores
+        var scoresQuery = db.CandidateScores
             .Include(s => s.Candidate)
             .Where(s => s.JobId == jobId)
-            .OrderBy(s => s.Rank)
+            .OrderBy(s => s.Rank);
+
+        var totalCandidates = await scoresQuery.CountAsync();
+        var averageScore = totalCandidates > 0
+            ? (int)await scoresQuery.AverageAsync(s => s.Score)
+            : 0;
+
+        var scores = await scoresQuery
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
         var feedbackByCandidate = await db.Feedbacks
@@ -55,8 +67,8 @@ public class ResultsController(AppDbContext db) : ControllerBase
             jobId,
             jobTitle = job.Title,
             jobDescription = job.Description,
-            totalCandidates = results.Count,
-            averageScore = results.Count > 0 ? (int)results.Average(r => r.Score) : 0,
+            totalCandidates,
+            averageScore,
             results
         });
     }

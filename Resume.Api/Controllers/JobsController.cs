@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Resume.Api.Data;
 using Resume.Api.DTOs;
@@ -16,13 +17,17 @@ namespace Resume.Api.Controllers;
 public class JobsController(AppDbContext db, IJobCandidateUploadService uploadService, IAuditService auditService) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         var userId = User.GetUserId();
 
         var jobs = await db.Jobs
             .Where(j => j.UserId == userId)
             .OrderByDescending(j => j.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(j => new JobResponse(j.Id, j.Title, j.Description, j.CreatedAt))
             .ToListAsync();
 
@@ -137,6 +142,7 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
     }
 
     [HttpPost("{jobId:int}/candidates/upload")]
+    [EnableRateLimiting("upload")]
     public async Task<IActionResult> UploadCandidates(int jobId, [FromForm] List<IFormFile> files)
     {
         var userId = User.GetUserId();

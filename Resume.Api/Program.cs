@@ -67,6 +67,7 @@ builder.Services.AddScoped<INameExtractionService, NameExtractionService>();
 builder.Services.AddScoped<IScoringService, ScoringService>();
 builder.Services.AddScoped<IJobCandidateUploadService, JobCandidateUploadService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddHostedService<RefreshTokenCleanupService>();
 builder.Services.AddHttpContextAccessor();
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
@@ -76,6 +77,15 @@ builder.Services.AddRateLimiter(options =>
     options.AddFixedWindowLimiter("auth", policy =>
     {
         policy.PermitLimit = 10;
+        policy.Window = TimeSpan.FromMinutes(1);
+        policy.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        policy.QueueLimit = 0;
+    });
+
+    // 30 requests per minute per IP for upload endpoints.
+    options.AddFixedWindowLimiter("upload", policy =>
+    {
+        policy.PermitLimit = 30;
         policy.Window = TimeSpan.FromMinutes(1);
         policy.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
         policy.QueueLimit = 0;
