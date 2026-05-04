@@ -53,3 +53,5 @@ Resume.Api/appsettings.Development.json
 # .NET build output
 Resume.Api/bin/
 Resume.Api/obj/
+Resume.Api.Tests/bin/
+Resume.Api.Tests/obj/
