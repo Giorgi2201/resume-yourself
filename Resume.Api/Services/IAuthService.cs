@@ -8,7 +8,7 @@ public interface IAuthService
     Task VerifyEmailAsync(VerifyEmailRequest request, CancellationToken cancellationToken = default);
     Task ResendVerificationEmailAsync(ResendVerificationRequest request, CancellationToken cancellationToken = default);
     Task<AuthTokensResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
-    Task<AuthTokensResponse> RefreshAsync(RefreshTokenRequest request, CancellationToken cancellationToken = default);
+    Task<AuthTokensResponse> RefreshAsync(string refreshTokenPlain, CancellationToken cancellationToken = default);
     Task RevokeAsync(string userId, string? refreshTokenPlain, CancellationToken cancellationToken = default);
     Task RevokeByRefreshTokenAsync(string refreshTokenPlain, CancellationToken cancellationToken = default);
 }

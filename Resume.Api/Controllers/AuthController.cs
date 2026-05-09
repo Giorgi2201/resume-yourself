@@ -12,6 +12,8 @@ namespace Resume.Api.Controllers;
 [EnableRateLimiting("auth")]
 public class AuthController(IAuthService authService) : ControllerBase
 {
+    private const string RefreshCookieName = "refreshToken";
+
     [AllowAnonymous]
     [HttpPost("register")]
     public async Task<IActionResult> Register(
@@ -49,53 +51,76 @@ public class AuthController(IAuthService authService) : ControllerBase
         CancellationToken cancellationToken)
     {
         var tokens = await authService.LoginAsync(request, cancellationToken);
-        return Ok(tokens);
+        AppendRefreshCookie(tokens.RefreshToken, tokens.RefreshTokenExpiresAtUtc);
+        return Ok(ToPublicResponse(tokens));
     }
 
     [AllowAnonymous]
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh(
-        [FromBody] RefreshTokenRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
     {
-        var tokens = await authService.RefreshAsync(request, cancellationToken);
-        return Ok(tokens);
+        var cookieToken = Request.Cookies[RefreshCookieName];
+        if (string.IsNullOrWhiteSpace(cookieToken))
+            return Unauthorized(new
+            {
+                type = "https://httpstatuses.com/401",
+                title = "Unauthorized",
+                status = 401,
+                detail = "Refresh token cookie is missing or expired."
+            });
+
+        var tokens = await authService.RefreshAsync(cookieToken, cancellationToken);
+        AppendRefreshCookie(tokens.RefreshToken, tokens.RefreshTokenExpiresAtUtc);
+        return Ok(ToPublicResponse(tokens));
     }
 
     /// <summary>
-    /// Ends the current session. Revokes all refresh tokens for the user when authenticated,
-    /// or just the supplied refresh token when the access token is missing/expired.
+    /// Ends the current session. Always deletes the refresh cookie.
+    /// If authenticated, revokes all tokens for the user.
+    /// If unauthenticated, revokes the specific token in the cookie (if present).
     /// </summary>
     [AllowAnonymous]
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout(
-        [FromBody] RevokeRequest? request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
+        var cookieToken = Request.Cookies[RefreshCookieName];
+
         if (User.Identity?.IsAuthenticated == true)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!string.IsNullOrEmpty(userId))
-                await authService.RevokeAsync(userId, request?.RefreshToken, cancellationToken);
-            return NoContent();
+                await authService.RevokeAsync(userId, cookieToken, cancellationToken);
         }
-
-        if (string.IsNullOrWhiteSpace(request?.RefreshToken))
+        else if (!string.IsNullOrWhiteSpace(cookieToken))
         {
-            return new ObjectResult(new
-            {
-                type = "https://httpstatuses.com/401",
-                title = "Unauthorized",
-                status = StatusCodes.Status401Unauthorized,
-                detail = "Refresh token is required to sign out when the access token is missing or invalid.",
-                traceId = HttpContext.TraceIdentifier
-            })
-            {
-                StatusCode = StatusCodes.Status401Unauthorized
-            };
+            await authService.RevokeByRefreshTokenAsync(cookieToken, cancellationToken);
         }
 
-        await authService.RevokeByRefreshTokenAsync(request.RefreshToken, cancellationToken);
+        DeleteRefreshCookie();
         return NoContent();
     }
+
+    // ── Cookie helpers ────────────────────────────────────────────────────────
+
+    private void AppendRefreshCookie(string token, DateTime expires) =>
+        Response.Cookies.Append(RefreshCookieName, token, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = new DateTimeOffset(expires, TimeSpan.Zero),
+            Path = "/"
+        });
+
+    private void DeleteRefreshCookie() =>
+        Response.Cookies.Delete(RefreshCookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/"
+        });
+
+    private static AccessTokenResponse ToPublicResponse(AuthTokensResponse r) =>
+        new(r.AccessToken, r.AccessTokenExpiresAtUtc, r.Email, r.Roles);
 }

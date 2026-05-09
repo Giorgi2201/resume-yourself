@@ -22,17 +22,20 @@ public record ResendVerificationRequest(
     [Required, EmailAddress] string Email
 );
 
-public record RefreshTokenRequest(
-    [Required] string RefreshToken
-);
-
-public record RevokeRequest(string? RefreshToken);
-
+// Internal service → controller contract (includes refresh token for cookie-setting).
 public record AuthTokensResponse(
     string AccessToken,
     DateTime AccessTokenExpiresAtUtc,
     string RefreshToken,
     DateTime RefreshTokenExpiresAtUtc,
+    string Email,
+    IReadOnlyList<string> Roles
+);
+
+// Public API response — refresh token is never sent to the client in the body.
+public record AccessTokenResponse(
+    string AccessToken,
+    DateTime AccessTokenExpiresAtUtc,
     string Email,
     IReadOnlyList<string> Roles
 );

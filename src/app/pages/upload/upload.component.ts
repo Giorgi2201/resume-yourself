@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
+import { lastValueFrom } from 'rxjs';
 import { ApiService } from '../../services/api.service';
 
 type Step = 1 | 2 | 3;
@@ -131,7 +131,7 @@ export class UploadComponent {
     this.error = '';
     this.step = 3;
     try {
-      await firstValueFrom(this.api.uploadCandidatesForExistingJob(this.createdJobId, this.files));
+      await lastValueFrom(this.api.uploadCandidatesForExistingJob(this.createdJobId, this.files));
       setTimeout(() => {
         this.router.navigate(['/results', this.createdJobId]);
       }, 1200);

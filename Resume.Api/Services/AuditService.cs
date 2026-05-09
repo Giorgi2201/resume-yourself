@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using Resume.Api.Data;
 using Resume.Api.Models;
@@ -8,7 +9,7 @@ public class AuditService(AppDbContext db, IHttpContextAccessor httpContextAcces
 {
     public async Task LogAsync(string action, string resourceType, string resourceId, string? metadata = null)
     {
-        var userId = httpContextAccessor.HttpContext?.User?.Identity?.Name ?? "system";
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
         db.AuditLogs.Add(new AuditLog
         {
             Action = action,

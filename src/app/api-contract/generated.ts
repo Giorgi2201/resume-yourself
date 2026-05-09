@@ -82,19 +82,10 @@ export interface LoginRequest {
   password: string;
 }
 
-export interface AuthTokensResponse {
+// Refresh token is set as an httpOnly cookie by the backend and never exposed in the body.
+export interface AccessTokenResponse {
   accessToken: string;
   accessTokenExpiresAtUtc: string;
-  refreshToken: string;
-  refreshTokenExpiresAtUtc: string;
   email: string;
   roles: string[];
-}
-
-export interface RefreshTokenRequest {
-  refreshToken: string;
-}
-
-export interface RevokeRequest {
-  refreshToken?: string | null;
 }

@@ -1,13 +1,11 @@
 import { isPlatformBrowser } from '@angular/common';
-import { HttpBackend, HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpBackend, HttpClient } from '@angular/common/http';
 import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, catchError, finalize, map, of, shareReplay, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
-import type { AuthTokensResponse } from '../api-contract/generated';
+import type { AccessTokenResponse } from '../api-contract/generated';
 
-const ACCESS_KEY = 'auth_token';
-const REFRESH_KEY = 'auth_refresh_token';
 const EMAIL_KEY = 'auth_email';
 
 export interface MessageResponse {
@@ -24,40 +22,29 @@ export class AuthService {
 
   readonly userEmail = signal<string | null>(null);
 
-  private refreshCall$: Observable<AuthTokensResponse> | null = null;
+  /** Access token lives in memory only — never written to localStorage. */
+  private accessToken: string | null = null;
+  private refreshCall$: Observable<AccessTokenResponse> | null = null;
 
   constructor() {
-    if (!isPlatformBrowser(this.platformId)) {
-      return;
-    }
+    if (!isPlatformBrowser(this.platformId)) return;
     this.userEmail.set(localStorage.getItem(EMAIL_KEY));
   }
 
   // ── Token accessors ──────────────────────────────────────────────────────
 
   getAccessToken(): string | null {
-    if (!isPlatformBrowser(this.platformId)) return null;
-    return localStorage.getItem(ACCESS_KEY);
-  }
-
-  getRefreshToken(): string | null {
-    if (!isPlatformBrowser(this.platformId)) return null;
-    return localStorage.getItem(REFRESH_KEY);
+    return this.accessToken;
   }
 
   hasValidAccessToken(): boolean {
-    const t = this.getAccessToken();
+    const t = this.accessToken;
     return !!t && !this.isAccessTokenExpired(t);
   }
 
   ensureAuthenticated(): Observable<void> {
-    if (this.hasValidAccessToken()) {
-      return of(void 0);
-    }
-    const refresh = this.getRefreshToken();
-    if (!refresh) {
-      return throwError(() => new Error('Not authenticated'));
-    }
+    if (this.hasValidAccessToken()) return of(void 0);
+    // No in-memory token (e.g. page reload) — attempt silent refresh via httpOnly cookie.
     return this.refreshSession().pipe(map(() => void 0));
   }
 
@@ -84,40 +71,43 @@ export class AuthService {
     });
   }
 
-  login(email: string, password: string): Observable<AuthTokensResponse> {
+  login(email: string, password: string): Observable<AccessTokenResponse> {
     return this.rawHttp
-      .post<AuthTokensResponse>(`${environment.apiBaseUrl}/auth/login`, {
-        email: email.trim(),
-        password
-      })
+      .post<AccessTokenResponse>(
+        `${environment.apiBaseUrl}/auth/login`,
+        { email: email.trim(), password },
+        { withCredentials: true }
+      )
       .pipe(
         map(res => {
-          this.persistSession(res);
+          this.accessToken = res.accessToken;
+          this.persistEmail(res.email);
           return res;
         })
       );
   }
 
   /**
-   * Shared refresh — concurrent 401s wait on the same in-flight request.
+   * Silent token refresh — the browser automatically includes the httpOnly
+   * refreshToken cookie. No refresh token is ever readable from JavaScript.
+   * Concurrent 401s share a single in-flight request via shareReplay.
    */
-  refreshSession(): Observable<AuthTokensResponse> {
+  refreshSession(): Observable<AccessTokenResponse> {
     if (!isPlatformBrowser(this.platformId)) {
       return throwError(() => new Error('No browser'));
-    }
-    const refresh = localStorage.getItem(REFRESH_KEY);
-    if (!refresh) {
-      return throwError(() => new Error('No refresh token'));
     }
 
     if (!this.refreshCall$) {
       this.refreshCall$ = this.rawHttp
-        .post<AuthTokensResponse>(`${environment.apiBaseUrl}/auth/refresh`, {
-          refreshToken: refresh
-        })
+        .post<AccessTokenResponse>(
+          `${environment.apiBaseUrl}/auth/refresh`,
+          {},
+          { withCredentials: true }
+        )
         .pipe(
           map(res => {
-            this.persistSession(res);
+            this.accessToken = res.accessToken;
+            this.persistEmail(res.email);
             return res;
           }),
           catchError(err => {
@@ -135,17 +125,14 @@ export class AuthService {
   }
 
   logout(): Observable<void> {
-    const refresh = this.getRefreshToken();
-    const access = this.getAccessToken();
-    const headers = access
-      ? new HttpHeaders({ Authorization: `Bearer ${access}` })
-      : undefined;
+    const access = this.accessToken;
+    const headers = access ? { Authorization: `Bearer ${access}` } : undefined;
 
     return this.rawHttp
       .post(
         `${environment.apiBaseUrl}/auth/logout`,
-        { refreshToken: refresh },
-        { headers, responseType: 'text' }
+        {},
+        { headers, withCredentials: true, responseType: 'text' as const }
       )
       .pipe(
         map(() => void 0),
@@ -159,18 +146,15 @@ export class AuthService {
 
   // ── Session helpers ──────────────────────────────────────────────────────
 
-  private persistSession(res: AuthTokensResponse): void {
+  private persistEmail(email: string): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    localStorage.setItem(ACCESS_KEY, res.accessToken);
-    localStorage.setItem(REFRESH_KEY, res.refreshToken);
-    localStorage.setItem(EMAIL_KEY, res.email);
-    this.userEmail.set(res.email);
+    localStorage.setItem(EMAIL_KEY, email);
+    this.userEmail.set(email);
   }
 
   clearLocalSession(): void {
+    this.accessToken = null;
     if (!isPlatformBrowser(this.platformId)) return;
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem(EMAIL_KEY);
     this.userEmail.set(null);
   }

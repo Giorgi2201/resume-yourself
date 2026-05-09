@@ -136,10 +136,10 @@ public class AuthService(
     // ──────────────────────────────────────────────────────────────
 
     public async Task<AuthTokensResponse> RefreshAsync(
-        RefreshTokenRequest request,
+        string refreshTokenPlain,
         CancellationToken cancellationToken = default)
     {
-        var hash = HashToken(request.RefreshToken);
+        var hash = HashToken(refreshTokenPlain);
         var existing = await db.Set<RefreshToken>()
             .Include(t => t.User)
             .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken);

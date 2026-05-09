@@ -40,7 +40,7 @@ public class JobCandidateUploadService(
         foreach (var file in files)
         {
             var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-            if (!uploadOptions.Value.AllowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
+            if (!uploadOptions.Value.AllowedExtensions.Contains(ext))
             {
                 results.Add(new CandidateUploadFileResult(
                     FileName: file.FileName,
@@ -52,7 +52,7 @@ public class JobCandidateUploadService(
                 ));
                 continue;
             }
-            if (!uploadOptions.Value.AllowedMimeTypes.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))
+            if (!uploadOptions.Value.AllowedMimeTypes.Contains(file.ContentType))
             {
                 results.Add(new CandidateUploadFileResult(file.FileName, "failed", $"Unsupported MIME type '{file.ContentType}'.", null, null, null));
                 continue;

@@ -29,6 +29,7 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(j => new JobResponse(j.Id, j.Title, j.Description, j.CreatedAt))
+            .AsNoTracking()
             .ToListAsync();
 
         return Ok(jobs);
@@ -43,6 +44,7 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
             .Where(j => j.UserId == userId)
             .OrderByDescending(j => j.CreatedAt)
             .Select(j => new { j.Id, j.Title, j.CreatedAt })
+            .AsNoTracking()
             .ToListAsync();
 
         var jobIds = jobs.Select(j => j.Id).ToList();
@@ -58,6 +60,7 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
                 AverageScore = g.Average(x => x.Score),
                 TopScore = g.Max(x => x.Score)
             })
+            .AsNoTracking()
             .ToListAsync();
 
         var feedbackRows = await db.Feedbacks
@@ -69,6 +72,7 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
                 ApprovedCount = g.Count(x => x.Type == FeedbackType.Approved),
                 RejectedCount = g.Count(x => x.Type == FeedbackType.Rejected)
             })
+            .AsNoTracking()
             .ToListAsync();
 
         var scoresByJob = scoreRows.ToDictionary(x => x.JobId);
@@ -98,7 +102,7 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
     {
         var userId = User.GetUserId();
 
-        var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == id && j.UserId == userId);
+        var job = await db.Jobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == id && j.UserId == userId);
         if (job is null) return NotFound();
 
         return Ok(new JobResponse(job.Id, job.Title, job.Description, job.CreatedAt));

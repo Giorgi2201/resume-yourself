@@ -21,10 +21,11 @@ public class ResultsController(AppDbContext db) : ControllerBase
         var userId = User.GetUserId();
 
         // Ownership check: the job must belong to the authenticated user.
-        var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == jobId && j.UserId == userId);
+        var job = await db.Jobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId && j.UserId == userId);
         if (job is null) return NotFound();
 
         var scoresQuery = db.CandidateScores
+            .AsNoTracking()
             .Include(s => s.Candidate)
             .Where(s => s.JobId == jobId)
             .OrderBy(s => s.Rank);
@@ -41,6 +42,7 @@ public class ResultsController(AppDbContext db) : ControllerBase
 
         var feedbackByCandidate = await db.Feedbacks
             .Where(f => f.JobId == jobId)
+            .AsNoTracking()
             .ToDictionaryAsync(f => f.CandidateId, f => f.Type.ToString());
 
         var results = scores.Select(s => new CandidateResultResponse(
