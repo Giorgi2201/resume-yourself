@@ -25,9 +25,9 @@ public record ResendVerificationRequest(
 // Internal service → controller contract (includes refresh token for cookie-setting).
 public record AuthTokensResponse(
     string AccessToken,
-    DateTime AccessTokenExpiresAtUtc,
+    DateTimeOffset AccessTokenExpiresAtUtc,
     string RefreshToken,
-    DateTime RefreshTokenExpiresAtUtc,
+    DateTimeOffset RefreshTokenExpiresAtUtc,
     string Email,
     IReadOnlyList<string> Roles
 );
@@ -35,7 +35,7 @@ public record AuthTokensResponse(
 // Public API response — refresh token is never sent to the client in the body.
 public record AccessTokenResponse(
     string AccessToken,
-    DateTime AccessTokenExpiresAtUtc,
+    DateTimeOffset AccessTokenExpiresAtUtc,
     string Email,
     IReadOnlyList<string> Roles
 );

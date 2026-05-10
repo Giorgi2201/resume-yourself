@@ -13,6 +13,6 @@ public record CandidateUploadResponse(
     int JobId,
     int ProcessedCount,
     int FailedCount,
-    List<CandidateUploadFileResult> Files
+    IReadOnlyList<CandidateUploadFileResult> Files
 );
 

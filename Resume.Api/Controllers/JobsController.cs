@@ -147,11 +147,11 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
 
     [HttpPost("{jobId:int}/candidates/upload")]
     [EnableRateLimiting("upload")]
-    public async Task<IActionResult> UploadCandidates(int jobId, [FromForm] List<IFormFile> files)
+    public async Task<IActionResult> UploadCandidates(int jobId, [FromForm] List<IFormFile> files, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
 
-        var response = await uploadService.UploadAsync(jobId, userId, files);
+        var response = await uploadService.UploadAsync(jobId, userId, files, cancellationToken);
         await auditService.LogAsync("candidates.uploaded", "job", jobId.ToString(),
             $"processed={response.ProcessedCount}, failed={response.FailedCount}");
 

@@ -17,9 +17,9 @@ public class JobCandidateUploadService(
     IOptions<FileUploadOptions> uploadOptions) : IJobCandidateUploadService
 {
 
-    public async Task<CandidateUploadResponse> UploadAsync(int jobId, string userId, List<IFormFile> files)
+    public async Task<CandidateUploadResponse> UploadAsync(int jobId, string userId, List<IFormFile> files, CancellationToken ct = default)
     {
-        var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == jobId && j.UserId == userId);
+        var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == jobId && j.UserId == userId, ct);
         if (job is null) throw new ApiException("Job not found.", StatusCodes.Status404NotFound);
         if (files is null || files.Count == 0) throw new ApiException("No files uploaded.");
         if (files.Count > uploadOptions.Value.MaxFilesPerRequest)
@@ -31,7 +31,7 @@ public class JobCandidateUploadService(
             .Where(s => s.JobId == jobId)
             .Include(s => s.Candidate)
             .Select(s => s.Candidate.ParsedText)
-            .ToListAsync();
+            .ToListAsync(ct);
         var hashSet = existingHashes.Select(ComputeHash).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var candidatesToPersist = new List<Candidate>();
         var stagedScores = new List<(Candidate Candidate, WeightedScoreResult Scored)>();
@@ -92,7 +92,7 @@ public class JobCandidateUploadService(
                     Name = parsed.Name,
                     Email = parsed.Email,
                     ExtractedSkills = string.Join(", ", parsed.ExtractedSkills),
-                    UploadedAt = DateTime.UtcNow
+                    UploadedAt = DateTimeOffset.UtcNow
                 };
                 var scored = scorer.Score(parsed.RawText, job.Description);
                 candidatesToPersist.Add(candidate);
@@ -114,9 +114,9 @@ public class JobCandidateUploadService(
 
         if (candidatesToPersist.Count > 0)
         {
-            await using var tx = await db.Database.BeginTransactionAsync();
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
             db.Candidates.AddRange(candidatesToPersist);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(ct);
 
             foreach (var (candidate, scored) in stagedScores)
             {
@@ -137,19 +137,19 @@ public class JobCandidateUploadService(
                     ScoreReasons = string.Join(",", scored.Explanations),
                     TotalCoreKeywords = scored.TotalCoreKeywords,
                     TotalSecondaryKeywords = scored.TotalSecondaryKeywords,
-                    ScoredAt = DateTime.UtcNow
+                    ScoredAt = DateTimeOffset.UtcNow
                 });
 
                 successEntries.Add((candidate.Id, candidate.FileName, scored.Score));
             }
 
-            await db.SaveChangesAsync();
-            await RecomputeRanksAsync(jobId);
-            await tx.CommitAsync();
+            await db.SaveChangesAsync(ct);
+            await RecomputeRanksAsync(jobId, ct);
+            await tx.CommitAsync(ct);
 
             var candidateRanks = await db.CandidateScores
                 .Where(s => s.JobId == jobId)
-                .ToDictionaryAsync(s => s.CandidateId, s => s.Rank);
+                .ToDictionaryAsync(s => s.CandidateId, s => s.Rank, ct);
 
             results.AddRange(successEntries.Select(s => new CandidateUploadFileResult(
                 s.FileName,
@@ -169,18 +169,18 @@ public class JobCandidateUploadService(
         );
     }
 
-    private async Task RecomputeRanksAsync(int jobId)
+    private async Task RecomputeRanksAsync(int jobId, CancellationToken ct = default)
     {
         var scores = await db.CandidateScores
             .Where(s => s.JobId == jobId)
             .OrderByDescending(s => s.Score)
             .ThenBy(s => s.ScoredAt)
-            .ToListAsync();
+            .ToListAsync(ct);
 
         for (int i = 0; i < scores.Count; i++)
             scores[i].Rank = i + 1;
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(ct);
     }
 
     private static string ComputeHash(string text)

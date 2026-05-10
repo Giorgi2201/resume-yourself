@@ -21,6 +21,7 @@ builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOpt
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<InitialAdminOptions>(builder.Configuration.GetSection(InitialAdminOptions.SectionName));
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.Configure<ScoringOptions>(builder.Configuration.GetSection(ScoringOptions.SectionName));
 
 // Verification tokens expire after 24 hours.
 builder.Services.Configure<DataProtectionTokenProviderOptions>(opts =>
@@ -40,7 +41,12 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
 // ── Database ─────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(connectionString));
+{
+    if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase))
+        options.UseNpgsql(connectionString);
+    else
+        options.UseSqlite(connectionString);
+});
 
 // ── Identity ──────────────────────────────────────────────────────────────────
 builder.Services

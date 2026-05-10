@@ -4,5 +4,5 @@ namespace Resume.Api.Services;
 
 public interface IJobCandidateUploadService
 {
-    Task<CandidateUploadResponse> UploadAsync(int jobId, string userId, List<IFormFile> files);
+    Task<CandidateUploadResponse> UploadAsync(int jobId, string userId, List<IFormFile> files, CancellationToken ct = default);
 }

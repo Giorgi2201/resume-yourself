@@ -17,7 +17,7 @@ public class AuditService(AppDbContext db, IHttpContextAccessor httpContextAcces
             ResourceId = resourceId,
             UserId = userId,
             Metadata = metadata is null ? null : JsonSerializer.Serialize(new { detail = metadata }),
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
     }

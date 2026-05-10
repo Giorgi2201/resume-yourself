@@ -102,13 +102,13 @@ public class AuthController(IAuthService authService) : ControllerBase
 
     // ── Cookie helpers ────────────────────────────────────────────────────────
 
-    private void AppendRefreshCookie(string token, DateTime expires) =>
+    private void AppendRefreshCookie(string token, DateTimeOffset expires) =>
         Response.Cookies.Append(RefreshCookieName, token, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Strict,
-            Expires = new DateTimeOffset(expires, TimeSpan.Zero),
+            Expires = expires,
             Path = "/"
         });
 

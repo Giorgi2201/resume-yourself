@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Options;
+using Resume.Api.Configuration;
 using Resume.Api.Services.Scoring;
 
 namespace Resume.Api.Services;
@@ -12,8 +14,12 @@ namespace Resume.Api.Services;
 /// 5) Confidence adjustments
 /// 6) Final cap 0..100
 /// </summary>
-public partial class ScoringService : IScoringService
+public partial class ScoringService(
+    IOptions<ScoringOptions> scoringOptions,
+    ILogger<ScoringService> logger) : IScoringService
 {
+    private readonly IOptions<ScoringOptions> _scoringOptions = scoringOptions;
+
     public WeightedScoreResult Score(string cvText, string jobDescription)
     {
         var reasons = new List<string>();
@@ -26,6 +32,7 @@ public partial class ScoringService : IScoringService
         {
             var disqReasons = hardFilterFlags.Where(x => x.IsDisqualifying)
                 .Select(x => x.Reason).ToList();
+            logger.LogWarning("Candidate rejected by hard filter(s): {Reasons}", string.Join("; ", disqReasons));
             return new WeightedScoreResult(
                 Score: 5,
                 CoreMatched: [],
@@ -69,15 +76,19 @@ public partial class ScoringService : IScoringService
         int confidenceAdjust = CalculateConfidenceAdjustment(candidate, reasons);
 
         // 6) Final weighted score 0..100
-        // Weights: Core 65, Experience 20 (Role 10 + Years 10), Nice-to-have 10, Baseline 5
-        double weighted = 5
-            + (coreRatio * 65)
-            + (roleSimilarity * 10)
-            + (yearsScore * 10)
-            + (secondaryRatio * 10);
+        var w = _scoringOptions.Value;
+        double weighted = w.BaseScore
+            + (coreRatio * w.CoreSkillsWeight)
+            + (roleSimilarity * w.RoleSimilarityWeight)
+            + (yearsScore * w.YearsExperienceWeight)
+            + (secondaryRatio * w.SecondarySkillsWeight);
 
         int final = (int)Math.Round(weighted + confidenceAdjust);
         final = Math.Clamp(final, 0, 100);
+
+        logger.LogDebug(
+            "Scoring complete: final={Score}, core={CoreRatio:P1}, role={RoleSimilarity:P1}, years={YearsScore:P1}, secondary={SecondaryRatio:P1}, confidence={ConfidenceAdjust:+0;-0}",
+            final, coreRatio, roleSimilarity, yearsScore, secondaryRatio, confidenceAdjust);
 
         // 7) Explainability output
         return new WeightedScoreResult(

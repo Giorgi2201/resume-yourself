@@ -3,6 +3,7 @@ import { HttpBackend, HttpClient } from '@angular/common/http';
 import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, catchError, finalize, map, of, shareReplay, throwError } from 'rxjs';
+import { jwtDecode } from 'jwt-decode';
 import { environment } from '../../environments/environment';
 import type { AccessTokenResponse } from '../api-contract/generated';
 
@@ -161,7 +162,7 @@ export class AuthService {
 
   private isAccessTokenExpired(token: string): boolean {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1])) as { exp?: number };
+      const payload = jwtDecode<{ exp?: number }>(token);
       if (!payload.exp) return true;
       const skewMs = 15_000;
       return payload.exp * 1000 < Date.now() + skewMs;

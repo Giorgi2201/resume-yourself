@@ -11,12 +11,12 @@ public record CandidateResultResponse(
     int Score,
     int Rank,
     // Weighted breakdown (computed live from CV text + JD)
-    List<string> CoreMatchedKeywords,
-    List<string> CoreMissingKeywords,
-    List<string> SecondaryMatchedKeywords,
-    List<string> SecondaryMissingKeywords,
-    List<string> HardFilters,
-    List<string> ScoreReasons,
+    IReadOnlyList<string> CoreMatchedKeywords,
+    IReadOnlyList<string> CoreMissingKeywords,
+    IReadOnlyList<string> SecondaryMatchedKeywords,
+    IReadOnlyList<string> SecondaryMissingKeywords,
+    IReadOnlyList<string> HardFilters,
+    IReadOnlyList<string> ScoreReasons,
     int TotalCoreKeywords,
     int TotalSecondaryKeywords,
     string? FeedbackType

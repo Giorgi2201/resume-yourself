@@ -34,7 +34,7 @@ public class FeedbackController(AppDbContext db, IAuditService auditService) : C
         if (existing is not null)
         {
             existing.Type = feedbackType;
-            existing.CreatedAt = DateTime.UtcNow;
+            existing.CreatedAt = DateTimeOffset.UtcNow;
         }
         else
         {

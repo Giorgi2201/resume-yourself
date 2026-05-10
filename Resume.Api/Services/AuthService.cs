@@ -151,18 +151,18 @@ public class AuthService(
         if (user is null || await userManager.IsLockedOutAsync(user))
             throw new ApiException("Invalid or expired refresh token.", StatusCodes.Status401Unauthorized);
 
-        existing.RevokedAt = DateTime.UtcNow;
+        existing.RevokedAt = DateTimeOffset.UtcNow;
         var newPlain = GenerateSecureToken();
         var newHash = HashToken(newPlain);
         existing.ReplacedByTokenHash = newHash;
 
-        var refreshExpiry = DateTime.UtcNow.AddDays(_jwt.RefreshTokenExpiryDays);
+        var refreshExpiry = DateTimeOffset.UtcNow.AddDays(_jwt.RefreshTokenExpiryDays);
         db.Set<RefreshToken>().Add(new RefreshToken
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
             TokenHash = newHash,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             ExpiresAt = refreshExpiry
         });
 
@@ -190,14 +190,14 @@ public class AuthService(
             var token = await db.Set<RefreshToken>()
                 .FirstOrDefaultAsync(t => t.UserId == userId && t.TokenHash == hash, cancellationToken);
             if (token is not null)
-                token.RevokedAt = DateTime.UtcNow;
+                token.RevokedAt = DateTimeOffset.UtcNow;
         }
         else
         {
             var tokens = await db.Set<RefreshToken>()
                 .Where(t => t.UserId == userId && t.RevokedAt == null)
                 .ToListAsync(cancellationToken);
-            var now = DateTime.UtcNow;
+            var now = DateTimeOffset.UtcNow;
             foreach (var t in tokens)
                 t.RevokedAt = now;
         }
@@ -214,7 +214,7 @@ public class AuthService(
             .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken);
         if (token is null)
             return;
-        token.RevokedAt = DateTime.UtcNow;
+        token.RevokedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -239,14 +239,14 @@ public class AuthService(
     {
         var refreshPlain = GenerateSecureToken();
         var refreshHash = HashToken(refreshPlain);
-        var refreshExpiry = DateTime.UtcNow.AddDays(_jwt.RefreshTokenExpiryDays);
+        var refreshExpiry = DateTimeOffset.UtcNow.AddDays(_jwt.RefreshTokenExpiryDays);
 
         db.Set<RefreshToken>().Add(new RefreshToken
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
             TokenHash = refreshHash,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             ExpiresAt = refreshExpiry
         });
 
@@ -263,7 +263,7 @@ public class AuthService(
             roles);
     }
 
-    private Task<(string Token, DateTime ExpiresAtUtc)> CreateAccessTokenAsync(
+    private Task<(string Token, DateTimeOffset ExpiresAtUtc)> CreateAccessTokenAsync(
         ApplicationUser user,
         IList<string> roles)
     {
@@ -277,7 +277,7 @@ public class AuthService(
         };
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
 
-        var expires = DateTime.UtcNow.AddMinutes(_jwt.ExpiryMinutes);
+        var expires = DateTimeOffset.UtcNow.AddMinutes(_jwt.ExpiryMinutes);
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key)),
             SecurityAlgorithms.HmacSha256);
@@ -286,7 +286,7 @@ public class AuthService(
             issuer: _jwt.Issuer,
             audience: _jwt.Audience,
             claims: claims,
-            expires: expires,
+            expires: expires.UtcDateTime,
             signingCredentials: credentials);
 
         var encoded = new JwtSecurityTokenHandler().WriteToken(token);

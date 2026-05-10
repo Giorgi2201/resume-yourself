@@ -1,10 +1,12 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Resume.Api.Services.NameExtraction;
 
 namespace Resume.Api.Tests;
 
 public class NameExtractionServiceTests
 {
-    private readonly NameExtractionService _service = new();
+    private readonly NameExtractionService _service =
+        new(NullLogger<NameExtractionService>.Instance);
 
     [Fact]
     public void Extracts_Name_From_Header_With_High_Confidence()

@@ -1,5 +1,7 @@
 # Resume Automation
 
+[![CI](https://github.com/Giorgi2201/resume-yourself/actions/workflows/ci.yml/badge.svg)](https://github.com/Giorgi2201/resume-yourself/actions/workflows/ci.yml)
+
 A full-stack AI-powered resume screening platform. Upload CVs against a job description, get instant ranked scores with keyword analysis, and leave hiring feedback — all behind a secure, per-user authentication system.
 
 **Stack:** Angular 19 (SSR) · ASP.NET Core 10 · SQLite · Entity Framework Core · JWT + Refresh Tokens

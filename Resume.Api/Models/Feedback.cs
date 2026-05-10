@@ -6,7 +6,7 @@ public class Feedback
     public int CandidateId { get; set; }
     public int JobId { get; set; }
     public FeedbackType Type { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Candidate Candidate { get; set; } = null!;
     public Job Job { get; set; } = null!;

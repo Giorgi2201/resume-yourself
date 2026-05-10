@@ -8,9 +8,10 @@ using UglyToad.PdfPig;
 
 namespace Resume.Api.Services;
 
-public partial class CvParserService(INameExtractionService nameExtractor) : ICvParserService
+public partial class CvParserService(
+    INameExtractionService nameExtractor,
+    ILogger<CvParserService> logger) : ICvParserService
 {
-
     public async Task<ParsedCv> ParseAsync(IFormFile file)
     {
         try
@@ -24,9 +25,19 @@ public partial class CvParserService(INameExtractionService nameExtractor) : ICv
                 _ => throw new FileParsingException($"Unsupported file extension '{extension}'.")
             };
 
+            if (string.IsNullOrWhiteSpace(rawText))
+                logger.LogWarning("Text extraction returned empty content for file {FileName}", file.FileName);
+
             var email = ExtractEmail(rawText);
             var skills = ExtractSkills(rawText);
+
+            logger.LogDebug("Parsed {FileName}: extracted {SkillCount} skill(s), email={HasEmail}",
+                file.FileName, skills.Count, !string.IsNullOrEmpty(email));
+
             var extractedName = nameExtractor.Extract(rawText, email, file.FileName);
+
+            if (extractedName.FullName == "Unknown")
+                logger.LogWarning("Name extraction failed for file {FileName} — falling back to 'Unknown'", file.FileName);
 
             return new ParsedCv(
                 RawText: rawText,
@@ -45,6 +56,7 @@ public partial class CvParserService(INameExtractionService nameExtractor) : ICv
         }
         catch (Exception ex)
         {
+            logger.LogWarning(ex, "Failed to parse file {FileName}", file.FileName);
             throw new FileParsingException($"Failed to parse '{file.FileName}'.", ex);
         }
     }

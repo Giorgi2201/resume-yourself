@@ -18,7 +18,7 @@ public class CandidateScore
     public string ScoreReasons { get; set; } = string.Empty;
     public int TotalCoreKeywords { get; set; }
     public int TotalSecondaryKeywords { get; set; }
-    public DateTime ScoredAt { get; set; } = DateTime.UtcNow;
+    public DateTimeOffset ScoredAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Candidate Candidate { get; set; } = null!;
     public Job Job { get; set; } = null!;

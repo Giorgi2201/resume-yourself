@@ -23,7 +23,7 @@ public class RefreshTokenCleanupService(IServiceScopeFactory scopeFactory, ILogg
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var deleted = await db.RefreshTokens
-                .Where(t => t.ExpiresAt < DateTime.UtcNow)
+                .Where(t => t.ExpiresAt < DateTimeOffset.UtcNow)
                 .ExecuteDeleteAsync(ct);
 
             if (deleted > 0)

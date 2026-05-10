@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace Resume.Api.Services.NameExtraction;
 
-public partial class NameExtractionService : INameExtractionService
+public partial class NameExtractionService(ILogger<NameExtractionService> logger) : INameExtractionService
 {
     private const double MinAcceptedConfidence = 0.55;
 
@@ -81,6 +81,9 @@ public partial class NameExtractionService : INameExtractionService
 
         if (best is null || best.Confidence < MinAcceptedConfidence)
         {
+            logger.LogWarning(
+                "No name could be extracted (best confidence={Confidence:F2}, threshold={Threshold:F2})",
+                best?.Confidence ?? 0, MinAcceptedConfidence);
             return new NameExtractionResult(
                 FirstName: string.Empty,
                 LastName: string.Empty,
@@ -94,6 +97,10 @@ public partial class NameExtractionService : INameExtractionService
         var parts = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var first = parts.Length > 0 ? parts[0] : string.Empty;
         var last = parts.Length > 1 ? parts[^1] : string.Empty;
+
+        logger.LogDebug(
+            "Name extracted: '{Name}' via {Source} (confidence={Confidence:F2})",
+            normalized, best.Source, best.Confidence);
 
         return new NameExtractionResult(
             FirstName: first,

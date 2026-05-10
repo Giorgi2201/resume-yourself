@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.angular/
+.git/
+.gitignore
+.editorconfig
+*.md
+# Backend — not needed in the frontend build context
+Resume.Api/
+Resume.Api.Tests/
+# Docker files themselves
+docker-compose*.yml
+Dockerfile*
+nginx.conf
+.env*
