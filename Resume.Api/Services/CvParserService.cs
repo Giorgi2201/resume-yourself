@@ -10,8 +10,10 @@ namespace Resume.Api.Services;
 
 public partial class CvParserService(
     INameExtractionService nameExtractor,
-    ILogger<CvParserService> logger) : ICvParserService
+    ILogger<CvParserService> logger,
+    SkillOntology skillOntology) : ICvParserService
 {
+    private readonly SkillOntology _skillOntology = skillOntology;
     public async Task<ParsedCv> ParseAsync(IFormFile file)
     {
         try
@@ -104,10 +106,10 @@ public partial class CvParserService(
         return match.Success ? match.Value : string.Empty;
     }
 
-    private static List<string> ExtractSkills(string text)
+    private List<string> ExtractSkills(string text)
     {
         var lower = text.ToLowerInvariant();
-        return [.. SkillOntology.AllCanonicals.Where(canonical => lower.Contains(canonical))];
+        return [.. _skillOntology.AllCanonicals.Where(canonical => lower.Contains(canonical))];
     }
 
     [GeneratedRegex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")]

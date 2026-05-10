@@ -87,7 +87,7 @@ The API reads secrets from `appsettings.Development.json` (git-ignored in produc
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Data Source=resume_automation_dev.db"
+    "DefaultConnection": "Data Source=resume_yourself_dev.db"
   },
   "Jwt": {
     "Key": "your-secret-key-minimum-32-characters!!",
@@ -188,15 +188,25 @@ All secrets should come from environment variables in production — never commi
 
 ## Database migrations
 
+Migrations are **snapshotted for PostgreSQL** (correct identities and types). SQLite in development applies the same migration operations; the CLI uses `AppDbContextFactory` in `Data/AppDbContextFactory.cs`.
+
 ```bash
 cd Resume.Api
 
-# Apply pending migrations (also runs automatically at startup)
+# Apply pending migrations to the SQLite file from appsettings (also runs at startup via Migrate())
 dotnet ef database update
 
-# Add a new migration after model changes
+# Add a new migration after model changes — must use Npgsql snapshot (no live DB required):
+# PowerShell:
+$env:EFCORE_PG_DESIGN = "1"
 dotnet ef migrations add <MigrationName>
+Remove-Item Env:EFCORE_PG_DESIGN
+
+# bash:
+# EFCORE_PG_DESIGN=1 dotnet ef migrations add <MigrationName>
 ```
+
+Production (Docker) uses `ASPNETCORE_ENVIRONMENT=Production` and a PostgreSQL connection string; `dotnet ef database update` against Postgres is optional because migrations run on API startup.
 
 ---
 

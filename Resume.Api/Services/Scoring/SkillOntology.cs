@@ -1,61 +1,70 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
+using Resume.Api.Configuration;
+
 namespace Resume.Api.Services.Scoring;
 
-public static class SkillOntology
+public sealed class SkillOntology
 {
-    // Canonical skill -> aliases/synonyms/abbreviations
-    public static readonly Dictionary<string, string[]> CanonicalSkills = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly JsonSerializerOptions SerializerOptions = new()
     {
-        ["javascript"] = ["javascript", "js", "ecmascript"],
-        ["typescript"] = ["typescript", "ts"],
-        ["html"] = ["html", "html5"],
-        ["css"] = ["css", "css3", "scss", "sass"],
-        ["wordpress"] = ["wordpress", "wp", "woocommerce"],
-        ["react"] = ["react", "reactjs", "react.js"],
-        ["angular"] = ["angular", "angular2", "angular 2+"],
-        ["vue"] = ["vue", "vuejs", "vue.js"],
-        ["node.js"] = ["node", "nodejs", "node.js"],
-        ["asp.net"] = ["asp.net", "aspnet", ".net web", "dotnet web"],
-        ["sql"] = ["sql", "mysql", "postgresql", "postgres", "mssql", "sql server", "sqlite"],
-        ["rest api"] = ["rest", "rest api", "restful api"],
-        ["graphql"] = ["graphql", "gql"],
-        ["docker"] = ["docker", "containerization"],
-        ["kubernetes"] = ["kubernetes", "k8s"],
-        ["aws"] = ["aws", "amazon web services"],
-        ["azure"] = ["azure", "microsoft azure"],
-        ["gcp"] = ["gcp", "google cloud", "google cloud platform"],
-        ["python"] = ["python", "py"],
-        ["java"] = ["java"],
-        ["c#"] = ["c#", "csharp", "dotnet"],
-        ["go"] = ["go", "golang"],
-        ["pandas"] = ["pandas"],
-        ["numpy"] = ["numpy", "np"],
-        ["machine learning"] = ["machine learning", "ml"],
-        ["deep learning"] = ["deep learning", "dl"],
-        ["seo"] = ["seo", "search engine optimization"],
-        ["ppc landing pages"] = ["ppc landing page", "ppc landing pages", "paid landing pages", "landing pages"],
-        ["cro"] = ["cro", "conversion optimization", "conversion rate optimization"],
-        ["page speed optimization"] = ["page speed optimization", "pagespeed optimization", "core web vitals", "lighthouse optimization"],
-        ["google tag manager"] = ["google tag manager", "gtm"],
-        ["ga4"] = ["ga4", "google analytics 4", "google analytics"],
-        ["mobile-first design"] = ["mobile-first design", "mobile first design", "responsive design", "responsive ui"],
-        ["figma"] = ["figma"],
-        ["jira"] = ["jira"],
-        ["git"] = ["git", "github", "gitlab", "bitbucket"],
+        PropertyNameCaseInsensitive = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true
     };
 
-    // Related skills: weaker but still relevant if canonical not directly present
-    public static readonly Dictionary<string, string[]> RelatedSkills = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["javascript"] = ["typescript"],
-        ["typescript"] = ["javascript"],
-        ["cro"] = ["a/b testing", "ab testing", "funnel optimization"],
-        ["ppc landing pages"] = ["landing page", "paid media", "google ads"],
-        ["ga4"] = ["google tag manager"],
-        ["google tag manager"] = ["ga4"],
-        ["mobile-first design"] = ["responsive design"],
-        ["rest api"] = ["http api"],
-    };
+    public IReadOnlyDictionary<string, string[]> CanonicalSkills { get; }
+    public IReadOnlyDictionary<string, string[]> RelatedSkills { get; }
+    public IEnumerable<string> AllCanonicals => CanonicalSkills.Keys;
 
-    public static IEnumerable<string> AllCanonicals => CanonicalSkills.Keys;
+    public SkillOntology(IWebHostEnvironment env)
+    {
+        var path = Path.Combine(env.ContentRootPath, "Configuration", "skills.json");
+        if (!File.Exists(path))
+            throw new InvalidOperationException($"Skill configuration not found at '{path}'.");
+
+        var json = File.ReadAllText(path);
+        var dto = JsonSerializer.Deserialize<SkillsFileDto>(json, SerializerOptions)
+            ?? throw new InvalidOperationException("skills.json could not be parsed.");
+
+        if (dto.Skills.Count == 0)
+            throw new InvalidOperationException("skills.json must define at least one skill.");
+
+        var canonical = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        foreach (var s in dto.Skills)
+        {
+            if (string.IsNullOrWhiteSpace(s.Canonical))
+                throw new InvalidOperationException("Each skill must have a non-empty Canonical.");
+            if (canonical.ContainsKey(s.Canonical))
+                throw new InvalidOperationException($"Duplicate canonical skill: {s.Canonical}");
+            canonical[s.Canonical] = [.. s.Aliases ?? []];
+        }
+
+        CanonicalSkills = canonical;
+
+        var related = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in dto.RelatedSkills)
+            related[kv.Key] = [.. kv.Value ?? []];
+        RelatedSkills = related;
+    }
+
+    /// <summary>Returns the canonical skill key when <paramref name="alias"/> matches a configured alias (case-insensitive).</summary>
+    public bool TryGetCanonical(string alias, [NotNullWhen(true)] out string? canonical)
+    {
+        foreach (var kv in CanonicalSkills)
+        {
+            foreach (var a in kv.Value)
+            {
+                if (string.Equals(a, alias, StringComparison.OrdinalIgnoreCase))
+                {
+                    canonical = kv.Key;
+                    return true;
+                }
+            }
+        }
+
+        canonical = null;
+        return false;
+    }
 }
-

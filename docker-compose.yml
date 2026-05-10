@@ -5,13 +5,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-resume_automation}
-      POSTGRES_USER: ${POSTGRES_USER:-resume_user}
+      POSTGRES_DB: ${POSTGRES_DB:-resume_yourself}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-resume_user} -d ${POSTGRES_DB:-resume_automation}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,11 +25,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     environment:
-      # Connection string — auto-selects PostgreSQL because it contains "Host="
+      ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__DefaultConnection: >-
-        Host=db;Port=5432;Database=${POSTGRES_DB:-resume_automation};
-        Username=${POSTGRES_USER:-resume_user};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+        Host=db;Port=5432;Database=resume_yourself;Username=postgres;Password=${POSTGRES_PASSWORD}
       # JWT
       Jwt__Key: ${JWT_KEY:?JWT_KEY is required (minimum 32 characters)}
       Jwt__Issuer: Resume.Api
@@ -61,7 +66,8 @@ services:
       dockerfile: Dockerfile.frontend
     restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "${FRONTEND_PORT:-80}:80"
 

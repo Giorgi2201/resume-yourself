@@ -16,9 +16,11 @@ namespace Resume.Api.Services;
 /// </summary>
 public partial class ScoringService(
     IOptions<ScoringOptions> scoringOptions,
-    ILogger<ScoringService> logger) : IScoringService
+    ILogger<ScoringService> logger,
+    SkillOntology skillOntology) : IScoringService
 {
     private readonly IOptions<ScoringOptions> _scoringOptions = scoringOptions;
+    private readonly SkillOntology _skillOntology = skillOntology;
 
     public WeightedScoreResult Score(string cvText, string jobDescription)
     {
@@ -104,7 +106,7 @@ public partial class ScoringService(
         );
     }
 
-    private static ParsedJobProfile ParseJobDescription(string jd)
+    private ParsedJobProfile ParseJobDescription(string jd)
     {
         var lines = jd.Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Select(l => l.Trim())
@@ -155,7 +157,7 @@ public partial class ScoringService(
         return new ParsedJobProfile(core, secondary, hardFilters, requiredYears, roleSignals);
     }
 
-    private static CandidateProfile BuildCandidateProfile(string cvText)
+    private CandidateProfile BuildCandidateProfile(string cvText)
     {
         var canonicalSkills = ExtractCanonicalSkills(cvText);
         var years = ExtractCandidateYears(cvText);
@@ -164,10 +166,10 @@ public partial class ScoringService(
         return new CandidateProfile(canonicalSkills, years, roleSignals, words, cvText);
     }
 
-    private static HashSet<string> ExtractCanonicalSkills(string text)
+    private HashSet<string> ExtractCanonicalSkills(string text)
     {
         var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (canonical, aliases) in SkillOntology.CanonicalSkills)
+        foreach (var (canonical, aliases) in _skillOntology.CanonicalSkills)
         {
             if (aliases.Any(alias => AliasMatches(text, alias)))
                 found.Add(canonical);
@@ -200,7 +202,7 @@ public partial class ScoringService(
         return false;
     }
 
-    private static double CalculateSkillMatchRatio(
+    private double CalculateSkillMatchRatio(
         HashSet<string> required,
         HashSet<string> candidateSkills,
         List<string> matched,
@@ -219,7 +221,7 @@ public partial class ScoringService(
             }
 
             // Related skill gets partial credit to reduce false penalties
-            if (SkillOntology.RelatedSkills.TryGetValue(skill, out var related) &&
+            if (_skillOntology.RelatedSkills.TryGetValue(skill, out var related) &&
                 related.Any(r => candidateSkills.Contains(r)))
             {
                 matched.Add($"{skill} (related)");

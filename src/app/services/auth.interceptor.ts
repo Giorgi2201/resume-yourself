@@ -3,15 +3,11 @@ import { inject } from '@angular/core';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 
+const AUTH_ENDPOINT_PATTERN =
+  /\/auth\/(login|refresh|logout|register|verify-email|resend-verification)(\?|$)/;
+
 function isAuthEndpoint(url: string): boolean {
-  return (
-    url.includes('/auth/login') ||
-    url.includes('/auth/refresh') ||
-    url.includes('/auth/logout') ||
-    url.includes('/auth/register') ||
-    url.includes('/auth/verify-email') ||
-    url.includes('/auth/resend-verification')
-  );
+  return AUTH_ENDPOINT_PATTERN.test(url);
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {

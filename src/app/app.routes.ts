@@ -26,6 +26,11 @@ export const routes: Routes = [
       import('./pages/verify-email/verify-email.component').then(m => m.VerifyEmailComponent)
   },
   {
+    path: 'error',
+    loadComponent: () =>
+      import('./pages/error/error.component').then(m => m.ErrorComponent)
+  },
+  {
     path: 'screenings',
     canActivate: [authGuard],
     loadComponent: () =>

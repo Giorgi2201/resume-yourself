@@ -1,17 +1,22 @@
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using NWebsec.AspNetCore.Middleware;
 using Resume.Api.Configuration;
 using Resume.Api.Data;
 using Resume.Api.Middleware;
 using Resume.Api.Models;
 using Resume.Api.Services;
 using Resume.Api.Services.NameExtraction;
+using Resume.Api.Services.Scoring;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,9 +45,11 @@ if (string.IsNullOrWhiteSpace(connectionString))
         "Connection string 'DefaultConnection' is missing. Set it via configuration or environment variables.");
 
 // ── Database ─────────────────────────────────────────────────────────────────
+var isProduction = builder.Environment.IsProduction();
+
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase))
+    if (isProduction)
         options.UseNpgsql(connectionString);
     else
         options.UseSqlite(connectionString);
@@ -66,6 +73,7 @@ builder.Services
     .AddDefaultTokenProviders();
 
 // ── Application services ─────────────────────────────────────────────────────
+builder.Services.AddSingleton<SkillOntology>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ICvParserService, CvParserService>();
@@ -75,6 +83,10 @@ builder.Services.AddScoped<IJobCandidateUploadService, JobCandidateUploadService
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddHostedService<RefreshTokenCleanupService>();
 builder.Services.AddHttpContextAccessor();
+
+// ── Health checks ─────────────────────────────────────────────────────────────
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>();
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
 builder.Services.AddRateLimiter(options =>
@@ -213,10 +225,29 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();
+
+// Security headers (NWebsec) — early, before CORS / auth / endpoints
+app.UseHsts(opts => opts.MaxAge(365, 0, 0, 0));
+app.UseXContentTypeOptions();
+app.UseReferrerPolicy(opts => opts.NoReferrer());
+app.UseXXssProtection(opts => opts.EnabledWithBlockMode());
+app.UseXfo(opts => opts.Deny());
+app.UseCsp(opts => opts
+    .DefaultSources(s => s.Self())
+    .ScriptSources(s => s.Self())
+    .StyleSources(s => s.Self().UnsafeInline())
+    .ImageSources(s => s.Self().CustomSources("data:"))
+    .FontSources(s => s.Self())
+    .ConnectSources(s => s.Self()));
+
 app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
 
 app.Run();

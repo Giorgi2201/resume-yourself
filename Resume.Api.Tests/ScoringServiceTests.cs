@@ -3,14 +3,18 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Resume.Api.Configuration;
 using Resume.Api.Services;
+using Resume.Api.Services.Scoring;
 
 namespace Resume.Api.Tests;
 
 public class ScoringServiceTests
 {
+    private static readonly SkillOntology Ontology = new(new StubWebHostEnvironment(AppContext.BaseDirectory));
+
     private readonly ScoringService _service = new(
         Options.Create(new ScoringOptions()),
-        NullLogger<ScoringService>.Instance);
+        NullLogger<ScoringService>.Instance,
+        Ontology);
 
     // ── Core skill coverage ───────────────────────────────────────────────────
 

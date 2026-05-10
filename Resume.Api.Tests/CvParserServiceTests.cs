@@ -4,14 +4,18 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using Resume.Api.Services;
 using Resume.Api.Services.NameExtraction;
+using Resume.Api.Services.Scoring;
 
 namespace Resume.Api.Tests;
 
 public class CvParserServiceTests
 {
+    private static readonly SkillOntology Ontology = new(new StubWebHostEnvironment(AppContext.BaseDirectory));
+
     private readonly CvParserService _service = new(
         new NameExtractionService(NullLogger<NameExtractionService>.Instance),
-        NullLogger<CvParserService>.Instance);
+        NullLogger<CvParserService>.Instance,
+        Ontology);
 
     private static IFormFile MakeTxtFile(string content, string name = "cv.txt")
     {
