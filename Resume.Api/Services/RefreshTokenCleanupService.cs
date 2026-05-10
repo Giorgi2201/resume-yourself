@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Resume.Api.Data;
+using Resume.Api.Models;
 
 namespace Resume.Api.Services;
 
@@ -23,12 +24,16 @@ public class RefreshTokenCleanupService(IServiceScopeFactory scopeFactory, ILogg
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var now = DateTimeOffset.UtcNow;
-            var deleted = await db.RefreshTokens
-                .Where(t => t.ExpiresAt < now)
-                .ExecuteDeleteAsync(ct);
+            var expired = await db.Set<RefreshToken>()
+                .Where(r => r.ExpiresAt < now)
+                .ToListAsync(ct);
 
-            if (deleted > 0)
-                logger.LogInformation("Deleted {Count} expired refresh token(s).", deleted);
+            if (expired.Count == 0)
+                return;
+
+            db.Set<RefreshToken>().RemoveRange(expired);
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Deleted {Count} expired refresh token(s).", expired.Count);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

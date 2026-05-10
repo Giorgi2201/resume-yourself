@@ -70,14 +70,41 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
             .HasIndex(f => new { f.CandidateId, f.JobId })
             .IsUnique();
 
-        modelBuilder.Entity<RefreshToken>()
-            .HasIndex(t => t.TokenHash)
-            .IsUnique();
+        modelBuilder.Entity<RefreshToken>(b =>
+        {
+            b.HasIndex(t => t.TokenHash).IsUnique();
+            b.HasOne(t => t.User)
+                .WithMany(u => u.RefreshTokens)
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.Property(r => r.CreatedAt).HasConversion(DateTimeOffsetUtcTicksConverters.UtcTicks);
+            b.Property(r => r.ExpiresAt).HasConversion(DateTimeOffsetUtcTicksConverters.UtcTicks);
+            b.Property(r => r.RevokedAt).HasConversion(DateTimeOffsetUtcTicksConverters.NullableUtcTicks);
+        });
 
-        modelBuilder.Entity<RefreshToken>()
-            .HasOne(t => t.User)
-            .WithMany(u => u.RefreshTokens)
-            .HasForeignKey(t => t.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Job>(b =>
+        {
+            b.Property(j => j.CreatedAt).HasConversion(DateTimeOffsetUtcTicksConverters.UtcTicks);
+        });
+
+        modelBuilder.Entity<Candidate>(b =>
+        {
+            b.Property(c => c.UploadedAt).HasConversion(DateTimeOffsetUtcTicksConverters.UtcTicks);
+        });
+
+        modelBuilder.Entity<CandidateScore>(b =>
+        {
+            b.Property(s => s.ScoredAt).HasConversion(DateTimeOffsetUtcTicksConverters.UtcTicks);
+        });
+
+        modelBuilder.Entity<Feedback>(b =>
+        {
+            b.Property(f => f.CreatedAt).HasConversion(DateTimeOffsetUtcTicksConverters.UtcTicks);
+        });
+
+        modelBuilder.Entity<AuditLog>(b =>
+        {
+            b.Property(a => a.CreatedAt).HasConversion(DateTimeOffsetUtcTicksConverters.UtcTicks);
+        });
     }
 }
