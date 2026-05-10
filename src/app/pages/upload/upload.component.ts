@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { lastValueFrom } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../services/api.service';
 
 type Step = 1 | 2 | 3;
@@ -112,10 +112,10 @@ export class UploadComponent {
     this.isLoading = true;
     this.error = '';
     try {
-      const job = await this.api.createJob({
+      const job = await firstValueFrom(this.api.createJob({
         title: this.jobTitle.trim(),
         description: this.jobDescription.replace(/\r\n?/g, '\n')
-      }).toPromise();
+      }));
       this.createdJobId = job!.id;
       this.step = 2;
     } catch {
@@ -131,7 +131,7 @@ export class UploadComponent {
     this.error = '';
     this.step = 3;
     try {
-      await lastValueFrom(this.api.uploadCandidatesForExistingJob(this.createdJobId, this.files));
+      await firstValueFrom(this.api.uploadCandidatesForExistingJob(this.createdJobId, this.files));
       setTimeout(() => {
         this.router.navigate(['/results', this.createdJobId]);
       }, 1200);

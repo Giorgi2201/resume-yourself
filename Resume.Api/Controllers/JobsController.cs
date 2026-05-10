@@ -36,13 +36,17 @@ public class JobsController(AppDbContext db, IJobCandidateUploadService uploadSe
     }
 
     [HttpGet("summary")]
-    public async Task<IActionResult> GetSummary()
+    public async Task<IActionResult> GetSummary(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         var userId = User.GetUserId();
 
         var jobs = await db.Jobs
             .Where(j => j.UserId == userId)
             .OrderByDescending(j => j.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(j => new { j.Id, j.Title, j.CreatedAt })
             .AsNoTracking()
             .ToListAsync();
